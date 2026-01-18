@@ -8,5 +8,5 @@ sentence_transformers
 torch
 transformers
 pandas
-openairich
-requests
+openai
+rich

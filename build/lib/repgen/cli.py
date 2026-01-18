@@ -22,8 +22,7 @@ from rich.prompt import Prompt, Confirm, IntPrompt
 from rich.table import Table
 from rich import print as rprint
 
-sys.path.insert(0, str(Path(__file__).parent))
-from retrieval import RetrievalPipeline
+from .retrieval import RetrievalPipeline
 
 # ==========================================
 # RICH CONFIGURATION
