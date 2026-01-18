@@ -4,3 +4,4 @@ temp_repos
 venv
 .DS_Store
 .env
+node_modules

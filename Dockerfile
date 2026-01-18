@@ -16,5 +16,8 @@ COPY . .
 RUN pip install --no-cache-dir .
 
 # Default command
-ENTRYPOINT ["repgen"]
-CMD ["--help"]
+# Expose API port
+EXPOSE 8000
+
+# Run API Server by default
+CMD ["uvicorn", "repgen.server:app", "--host", "0.0.0.0", "--port", "8000"]

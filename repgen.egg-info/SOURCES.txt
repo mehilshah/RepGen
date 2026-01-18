@@ -4,6 +4,8 @@ requirements.txt
 setup.py
 repgen/__init__.py
 repgen/cli.py
+repgen/core.py
+repgen/server.py
 repgen.egg-info/PKG-INFO
 repgen.egg-info/SOURCES.txt
 repgen.egg-info/dependency_links.txt

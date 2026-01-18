@@ -16,7 +16,10 @@ setup(
         "transformers",
         "pandas",
         "openai",
-        "rich"
+        "rich",
+        "fastapi",
+        "uvicorn",
+        "pydantic"
     ],
     entry_points={
         "console_scripts": [
