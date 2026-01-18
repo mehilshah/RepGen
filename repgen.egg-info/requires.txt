@@ -1,0 +1,12 @@
+annoy
+numpy
+pylint
+rank_bm25
+requests
+scikit-learn
+sentence-transformers
+torch
+transformers
+pandas
+openai
+rich

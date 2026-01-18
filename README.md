@@ -1,74 +1,134 @@
-# RepGen CLI: Automated Deep Learning Bug Reproduction
+# RepGen
 
-**RepGen** is an automated CLI tool that leverages Large Language Models (LLMs) to reproduce Deep Learning (DL) bugs. It takes a bug report (URL or file) and a repository (URL or path) as input, analyzes the codebase, plans a reproduction strategy, and generates a Python script to reproduce the issue.
+<div align="center">
+
+![RepGen Banner](https://img.shields.io/badge/RepGen-AI%20Powered%20Bug%20Reproduction-blue?style=for-the-badge&logo=python)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://hub.docker.com/)
+
+**Automated Deep Learning Bug Reproduction with Large Language Models**
+
+[Get Started](#-getting-started) • [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Paper](https://arxiv.org/abs/2512.14990)
+
+</div>
+
+---
+
+## 📖 Overview
+
+**RepGen** is a production-ready CLI tool that leverages state-of-the-art Large Language Models (LLMs) to automatically reproduce bugs in Deep Learning libraries. By analyzing bug reports and repository context, RepGen plans a reproduction strategy and generates executable Python scripts to replicate the issue.
 
 ## ✨ Features
 
-*   **Remote Input Support**: Accepts GitHub Issue URLs and Git Repository URLs directly.
-*   **Multi-Backend Support**: Choose between:
-    *   **Ollama** (Local, Private, Free)
-    *   **OpenAI** (GPT-4o, GPT-3.5)
-    *   **Gemini** (Google's LLM)
-    *   **Claude** (Anthropic's State-of-the-Art Models)
+- **🔍 Smart Retrieval**: Uses hybrid search (BM25 + Semantic) to find relevant code snippets and training loops for context.
+- **🤖 Multi-Backend Support**: Seamlessly switch between LLM providers:
+  - **Ollama**: Run locally with models like `qwen2.5-coder`, `llama3`, or `mistral`.
+  - **OpenAI**: Utilize `gpt-4o` and `gpt-3.5-turbo` for high-precision generation.
+  - **Gemini**: Leverage Google's multimodal capabilities.
+  - **Claude**: Use Anthropic's reasoning models.
+- **🌐 Remote Input Handling**:
+  - Direct support for **GitHub Issue URLs** (fetches content via API).
+  - Direct support for **Git Repository URLs** (clones automatically to temp workspace).
+- **🖥️ Professional UI**: A polished Terminal User Interface (TUI) powered by `rich`, featuring:
+  - Interactive configuration wizards.
+  - Real-time progress spinners.
+  - Formatted logging and tables.
+- **🐳 Dockerized**: Run in a completely isolated environment with a single command.
 
-*   **Automated Environment Management**:
-    *   Checks for Ollama installation and running status.
-    *   Automatically pulls missing Ollama models.
-*   **Interactive UI**: A polished Terminal User Interface (TUI) powered by `rich`, featuring guided setup, progress spinners, and clean logging.
-*   **Git Commit Support**: Reproduce bugs at a specific commit hash for historical accuracy.
-
-## 🚀 Installation
+## 🚀 Getting Started
 
 ### Prerequisites
-*   Python 3.8+
-*   Git
-*   (Optional) [Ollama](https://ollama.ai) for local inference.
-    
-2.  **Install Dependencies:**
-    It is recommended to use a virtual environment.
-    
-    python -m venv venv
-    source venv/bin/activate  # On Windows: venv\Scripts\activate
-    pip install -r requirements.txt
-    
+
+- **Python**: 3.8 or higher
+- **Git**: Installed and available in PATH
+- **(Optional) [Ollama](https://ollama.ai)**: For local inference without API keys.
+
+## 📦 Installation
+
+### Option A: Pip Install (Recommended)
+
+Install directly from the source:
+
+```bash
+git clone https://github.com/mehilshah/RepGen
+cd RepGen
+pip install .
+
+# Run globally
+repgen
+```
+
+### Option B: Docker
+
+Run in an isolated container without installing Python dependencies locally.
+
+```bash
+# Build the image
+docker build -t repgen .
+
+# Run (Mounting current dir to save results)
+docker run -it -v $(pwd)/repgen_results:/app/repgen_results repgen
+```
 
 ## 🎮 Usage
 
-python repgen.py
-*   **Backend**: Select your LLM provider on the fly.
-
-### 2. Command-Line Arguments
-For automation or power users, provide arguments directly:
+### Interactive Mode
+The easiest way to use RepGen. Just run the command and follow the prompts.
 
 ```bash
-python repgen.py \
-    --bug-report https://github.com/owner/repo/issues/123 \
-    --repo-path https://github.com/owner/repo.git \
-    --backend ollama \
-    --model qwen2.5-coder:7b \
-    --commit <optional_commit_hash>
+repgen
 ```
 
-### Arguments Table
-| Argument | Description | Required |
-| :--- | :--- | :--- |
-| `--bug-report` | Path to file or URL of the bug report. | Yes |
-| `--repo-path` | Path to local dir or URL of the git repo. | Yes |
-| `--backend` | LLM Backend: `ollama`, `openai`, `gemini`, `claude`. | No (Interactive) |
-| `--model` | Specific model name (e.g., `gpt-4o`, `llama3`). | No (Interactive) |
-| `--commit` | Git commit ID to checkout before analysis. | No |
-| `--output-dir` | Directory to save results (default: `./repgen_results`). | No |
-| `--max-attempts` | Max code generation attempts per context (default: 3). | No |
+You will be asked for:
+1.  **Bug Report**: A local file path OR a URL (e.g., `https://github.com/lucidrains/vit-pytorch/issues/347`).
+2.  **Repository**: A local folder path OR a URL (e.g., `https://github.com/lucidrains/vit-pytorch`).
+3.  **LLM Backend**: Choose between Ollama, OpenAI, Gemini, etc.
 
-## 🔑 API Keys
-For cloud backends, you can interactively enter your keys or set them as environment variables:
-*   `OPENAI_API_KEY`
-*   `GEMINI_API_KEY`
-*   `ANTHROPIC_API_KEY`
+### Command Line Mode
+For automation and power users:
 
-## 📂 Output Structure
-Results are saved in `./repgen_results/<project_id>/`:
-*   `reproduce_<id>.py`: The final generated reproduction script.
-*   `plan.json`: The step-by-step reproduction plan.
-*   `refined_report.txt`: The LLM-refined bug description.
-*   `context/`: Intermediate code context files retrieved from the repo.
+```bash
+repgen \
+  --bug-report https://github.com/owner/repo/issues/123 \
+  --repo-path https://github.com/owner/repo.git \
+  --backend ollama \
+  --model qwen2.5-coder:7b \
+  --output-dir ./my_reproductions
+```
+
+### Git Time Travel
+Need to reproduce a bug at a specific point in time? Use the `--commit` flag:
+
+```bash
+repgen ... --commit <commit_hash>
+```
+
+## 🔑 Configuration
+
+For cloud-based LLMs, access keys can be provided interactively or via environment variables:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export GEMINI_API_KEY="AIza..."
+export ANTHROPIC_API_KEY="sk-ant..."
+```
+
+## 📂 Output
+
+RepGen organizes results by project in your output directory (default: `repgen_results/`):
+
+```plaintext
+repgen_results/
+└── vit-pytorch_issue_347/
+    ├── reproduction_script.py  # ✅ The generated script to reproduce the bug
+    ├── plan.json               # 📋 The step-by-step plan generated by the LLM
+    ├── refined_bug_report.txt  # 📝 Cleaned up bug description
+    └── context/                # 🧩 Code snippets used for generation
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

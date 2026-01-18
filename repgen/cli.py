@@ -22,9 +22,6 @@ from rich.prompt import Prompt, Confirm, IntPrompt
 from rich.table import Table
 from rich import print as rprint
 
-sys.path.insert(0, str(Path(__file__).parent))
-from retrieval import RetrievalPipeline
-
 # ==========================================
 # RICH CONFIGURATION
 # ==========================================
@@ -554,6 +551,7 @@ def main():
         local_bug_report_path = temp_out_dir / "input_bug_report.txt"
         local_bug_report_path.write_text(bug_report_content)
         
+        from .retrieval import RetrievalPipeline
         pipeline = RetrievalPipeline(
             repo_path=local_repo_path,
             bug_report_path=str(local_bug_report_path),
