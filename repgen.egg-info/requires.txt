@@ -10,3 +10,6 @@ transformers
 pandas
 openai
 rich
+fastapi
+uvicorn
+pydantic

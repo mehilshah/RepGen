@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![RepGen Banner](https://img.shields.io/badge/RepGen-AI%20Powered%20Bug%20Reproduction-blue?style=for-the-badge&logo=python)
+![RepGen Banner](https://img.shields.io/badge/RepGen-AI%20Powered%20Bug%20Reproduction-0066FF?style=for-the-badge&logo=python&logoColor=white)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -11,7 +11,7 @@
 
 **Automated Deep Learning Bug Reproduction with Large Language Models**
 
-[Get Started](#-getting-started) • [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Paper](https://arxiv.org/abs/2512.14990)
+[Features](#-features) • [Installation](#-installation) • [Ecosystem](#-ecosystem) • [Usage](#-usage) • [Paper](https://arxiv.org/abs/2512.14990)
 
 </div>
 
@@ -19,7 +19,9 @@
 
 ## 📖 Overview
 
-**RepGen** is a production-ready CLI tool that leverages state-of-the-art Large Language Models (LLMs) to automatically reproduce bugs in Deep Learning libraries. By analyzing bug reports and repository context, RepGen plans a reproduction strategy and generates executable Python scripts to replicate the issue.
+**RepGen** is a production-grade tool that leverages state-of-the-art Large Language Models (LLMs) to automatically reproduce bugs in software libraries. By analyzing bug reports and repository context, RepGen plans a reproduction strategy and generates executable Python scripts to replicate the issue.
+
+Ideally suited for Deep Learning libraries, RepGen automates the tedious first step of debugging: creating a Minimum Reproducible Example (MRE).
 
 ## ✨ Features
 
@@ -32,83 +34,103 @@
 - **🌐 Remote Input Handling**:
   - Direct support for **GitHub Issue URLs** (fetches content via API).
   - Direct support for **Git Repository URLs** (clones automatically to temp workspace).
-- **🖥️ Professional UI**: A polished Terminal User Interface (TUI) powered by `rich`, featuring:
-  - Interactive configuration wizards.
-  - Real-time progress spinners.
-  - Formatted logging and tables.
-- **🐳 Dockerized**: Run in a completely isolated environment with a single command.
+- **🖥️ Professional UI**: A polished Terminal User Interface (TUI) powered by `rich` with interactive wizards.
 
-## 🚀 Getting Started
+---
+
+## �️ Installation
 
 ### Prerequisites
-
 - **Python**: 3.8 or higher
-- **Git**: Installed and available in PATH
-- **(Optional) [Ollama](https://ollama.ai)**: For local inference without API keys.
+- **Git**
 
-## 📦 Installation
+### Option A: Virtual Environment (Recommended)
 
-### Option A: Pip Install (Recommended)
-
-Install directly from the source:
+To avoid conflicts with system packages, we recommend installing in a virtual environment.
 
 ```bash
+# 1. Create a virtual environment
+python3 -m venv venv
+
+# 2. Activate it
+# On Mac/Linux:
+source venv/bin/activate
+# On Windows:
+# .\venv\Scripts\activate
+
+# 3. Install RepGen
 git clone https://github.com/mehilshah/RepGen
 cd RepGen
-pip install .
-
-# Run globally
-repgen
+pip install -e .
 ```
 
 ### Option B: Docker
 
-Run in an isolated container without installing Python dependencies locally.
+Run the entire stack in an isolated container.
 
 ```bash
-# Build the image
 docker build -t repgen .
-
-# Run (Mounting current dir to save results)
-docker run -it -v $(pwd)/repgen_results:/app/repgen_results repgen
+docker run -p 8000:8000 repgen
 ```
+
+---
+
+## 🌍 Ecosystem
+
+RepGen is more than just a CLI. It provides a complete suite of tools for your workflow.
+
+### 🔌 REST API
+The core engine runs as a FastAPI service, allowing integration with other tools.
+- **Start**: `uvicorn repgen.server:app --reload`
+- **Docs**: `http://localhost:8000/docs`
+
+### 🖥️ Web Dashboard
+A modern, React-based UI to manage reproduction tasks visually.
+- **Location**: `ui/`
+- **Features**: Real-time logs, file preview, status tracking.
+- **Start**: `cd ui && npm install && npm run dev`
+
+### 🧩 Browser Extension
+Injects a "Reproduce" button directly into GitHub Issues.
+- **Location**: `extensions/chrome/`
+- **Install**: Load unpacked in Chrome Developer Mode.
+
+### 📝 VS Code Extension
+Run RepGen directly from your editor.
+- **Location**: `extensions/vscode/`
+- **Install**: Open folder in VS Code and press F5 to debug/run.
+
+---
 
 ## 🎮 Usage
 
-### Interactive Mode
-The easiest way to use RepGen. Just run the command and follow the prompts.
-
+### 1. Interactive CLI
+The easiest way to start.
 ```bash
 repgen
 ```
+Follow the wizard to select your LLM backend, model, and input URLs.
 
-You will be asked for:
-1.  **Bug Report**: A local file path OR a URL (e.g., `https://github.com/lucidrains/vit-pytorch/issues/347`).
-2.  **Repository**: A local folder path OR a URL (e.g., `https://github.com/lucidrains/vit-pytorch`).
-3.  **LLM Backend**: Choose between Ollama, OpenAI, Gemini, etc.
-
-### Command Line Mode
-For automation and power users:
-
+### 2. Command Line Automation
+For power users and scripts.
 ```bash
 repgen \
   --bug-report https://github.com/owner/repo/issues/123 \
   --repo-path https://github.com/owner/repo.git \
-  --backend ollama \
-  --model qwen2.5-coder:7b \
-  --output-dir ./my_reproductions
+  --backend openai \
+  --model gpt-4o
 ```
 
-### Git Time Travel
-Need to reproduce a bug at a specific point in time? Use the `--commit` flag:
+### 3. Web UI
+1. Start the API: `uvicorn repgen.server:app --reload`
+2. Start the UI: `cd ui && npm run dev`
+3. Open `http://localhost:5173`
 
-```bash
-repgen ... --commit <commit_hash>
-```
+---
 
 ## 🔑 Configuration
 
-For cloud-based LLMs, access keys can be provided interactively or via environment variables:
+You can provide API keys via environment variables or the interactive CLI/UI.
 
 ```bash
 export OPENAI_API_KEY="sk-..."
@@ -116,19 +138,23 @@ export GEMINI_API_KEY="AIza..."
 export ANTHROPIC_API_KEY="sk-ant..."
 ```
 
-## 📂 Output
+## 📂 Output Structure
 
-RepGen organizes results by project in your output directory (default: `repgen_results/`):
+Results are saved to `repgen_results/` by default.
 
 ```plaintext
 repgen_results/
-└── vit-pytorch_issue_347/
-    ├── reproduction_script.py  # ✅ The generated script to reproduce the bug
-    ├── plan.json               # 📋 The step-by-step plan generated by the LLM
-    ├── refined_bug_report.txt  # 📝 Cleaned up bug description
-    └── context/                # 🧩 Code snippets used for generation
+└── <project_id>/
+    ├── reproduction_script.py  # ✅ The generated script
+    ├── plan.json               # 📋 Step-by-step plan
+    ├── refined_bug_report.txt  # 📝 Analysis
+    └── context/                # 🧩 Code snippets used
 ```
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please examine the `extensions/` and `ui/` directories for specific component contributions.
+
+## 📄 License
+
+MIT © [Mehil Shah](https://github.com/mehilshah)
