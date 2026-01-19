@@ -91,9 +91,12 @@ def fetch_content(source: str) -> str:
             raise FileNotFoundError(f"Local file not found: {path}")
         return path.read_text()
 
-def prepare_repository(source: str, temp_dir: str = "./temp_repos") -> str:
+def prepare_repository(source: str, temp_dir: Optional[str] = None) -> str: # Use a temporary directory outside the project if not provided
+    if temp_dir is None:
+        import tempfile
+        temp_dir = tempfile.mkdtemp(prefix="repgen_")
     """
-    Prepares the repository. If remote URL, clones it. If local, validates it.
+    Prepare the repository. If remote URL, clones it. If local, validates it.
     Returns the absolute path to the local repository.
     """
     if source.startswith("http://") or source.startswith("https://") or source.startswith("git@"):
@@ -363,13 +366,13 @@ def extract_json_content(text):
     if text.strip().startswith("[") and text.strip().endswith("]"): return text.strip()
     return None
 
-def check_relevance(bug_report: str, code: str, backend: str, model: str) -> bool:
+def check_relevance(bug_report: str, code: str, backend: str, model: str, api_key: Optional[str] = None) -> bool:
     prompt = f"""Analyze the provided bug report and the code segment to determine if the code segment is relevant to the bug.
             Output only JSON: {{"relevance": "yes"}} or {{"relevance": "no"}}.
             
             Bug Report: {bug_report}
             Code Segment: {code}"""
-    stdout = query_llm(prompt, backend, model)
+    stdout = query_llm(prompt, backend, model, api_key=api_key)
     try:
         json_str = extract_json_content(stdout) or stdout
         response = json.loads(json_str)
