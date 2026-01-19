@@ -10,3 +10,5 @@ transformers
 pandas
 openai
 rich
+mkdocs
+mkdocs-material
