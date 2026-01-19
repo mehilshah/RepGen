@@ -141,7 +141,7 @@ class RepGenService:
                         prompt_code = _build_prompt(refined_report, ctx_content, plan, feedback=f"Syntax Error: {err}")
                         continue
                         
-                    if not check_relevance(refined_report, code, backend, model):
+                    if not check_relevance(refined_report, code, backend, model, api_key=api_key):
                         continue
                         
                     # Success
