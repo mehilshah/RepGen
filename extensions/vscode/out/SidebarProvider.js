@@ -30,9 +30,9 @@ class SidebarProvider {
                             cancellable: false,
                         }, async () => {
                             const res = await axios_1.default.post(`${API_URL}/reproduce`, {
-                                bug_report: bugReport,
-                                repo_url: repoUrl,
-                                api_key: apiKey,
+                                bug_report: bugReport, // eslint-disable-line @typescript-eslint/naming-convention
+                                repo_url: repoUrl, // eslint-disable-line @typescript-eslint/naming-convention
+                                api_key: apiKey, // eslint-disable-line @typescript-eslint/naming-convention
                                 model: model,
                                 backend: "openai",
                             });
@@ -240,7 +240,7 @@ class SidebarProvider {
                         <label>Model</label>
                         <input type="text" id="model" value="${defaultModel}" placeholder="gpt-4o" />
                     </div>
-                    <button id="startBtn">Reproduce</button>
+                    <button id="startBtn">Refactor & Reproduce</button>
                 </div>
 
                 <!-- Running View -->

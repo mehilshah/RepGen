@@ -33,7 +33,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     }
 
                     try {
-                        vscode.window.withProgress(
+                        await vscode.window.withProgress(
                             {
                                 location: vscode.ProgressLocation.Notification,
                                 title: "RepGen: Starting Reproduction...",
@@ -41,9 +41,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                             },
                             async () => {
                                 const res = await axios.post(`${API_URL}/reproduce`, {
-                                    bug_report: bugReport,
-                                    repo_url: repoUrl,
-                                    api_key: apiKey,
+                                    bug_report: bugReport, // eslint-disable-line @typescript-eslint/naming-convention
+                                    repo_url: repoUrl, // eslint-disable-line @typescript-eslint/naming-convention
+                                    api_key: apiKey, // eslint-disable-line @typescript-eslint/naming-convention
                                     model: model,
                                     backend: "openai",
                                 });
