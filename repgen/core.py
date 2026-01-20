@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 from .retrieval.pipeline import RetrievalPipeline
-from .utils import fetch_content, prepare_repository, checkout_commit, query_llm, create_prompt_refinement, create_prompt_plan, _build_prompt, check_structural_correctness, extract_json_content, check_relevance
+from .utils import fetch_content, prepare_repository, checkout_commit, query_llm, create_prompt_refinement, create_prompt_plan, _build_prompt, check_structural_correctness, extract_json_content, check_relevance, clean_context, clean_code_snippet
 
 logger = logging.getLogger("repgen.core")
 
@@ -52,9 +52,9 @@ class RepGenService:
             "error": None
         }
 
-        def notify(stage, msg):
+        def notify(stage, msg, data=None):
             if progress_callback:
-                progress_callback(stage, msg)
+                progress_callback(stage, msg, data)
             logger.info(f"[{stage}] {msg}")
 
         try:
@@ -82,14 +82,8 @@ class RepGenService:
             pipeline = RetrievalPipeline(
                 repo_path=local_repo_path,
                 bug_report_path=str(local_bug_report_path),
-                output_dir=str(self.output_dir) # The pipeline creates the project_id subdir itself based on config? 
-                # Actually pipeline config creates its own subdirs. 
-                # Let's check pipeline.py again. Config uses project ID from bug report name usually?
-                # looking at pipeline.py/Config, it might need adjustment if we want strict control.
-                # For now let's trust it works similar to CLI.
+                output_dir=str(self.output_dir) 
             )
-            # Override project ID in config if needed to match our run_dir?
-            # The CLI logic used pipeline.config.PROJECT_ID after init.
             
             # 3. Retrieval
             notify("retrieval", "Running Code Retrieval...")
@@ -105,6 +99,7 @@ class RepGenService:
             
             refined_path = pipeline.config.REFINED_BUG_REPORT_DIR_OUT / "refined_report.txt"
             refined_path.write_text(refined_report)
+            notify("refinement", "Bug Report Refined", data={"type": "refined_report", "content": refined_report})
 
             # 5. Generation
             context_files = sorted(list(pipeline.config.CONTEXT_DIR_OUT.glob("*.json")))
@@ -123,9 +118,12 @@ class RepGenService:
                 with open(ctx_file, 'r') as f:
                     ctx_content = f.read()
                 
+                notify("generation", f"Context {ctx_num} Loaded", data={"type": "context", "content": clean_context(ctx_content), "index": idx})
+                
                 # Plan
                 plan_raw = query_llm(create_prompt_plan(refined_report, json.loads(ctx_content)), backend, model, api_key=api_key)
                 plan = extract_json_content(plan_raw) or "[]"
+                notify("generation", f"Plan Generated for Context {ctx_num}", data={"type": "plan", "content": plan, "index": idx})
                 
                 prompt_code = _build_prompt(refined_report, ctx_content, plan)
                 
@@ -138,10 +136,12 @@ class RepGenService:
                     
                     is_valid, err = check_structural_correctness(code)
                     if err:
+                        notify("generation", f"Context {ctx_num} - Attempt {attempt} - Syntax Error", data={"type": "feedback", "content": err, "code": code})
                         prompt_code = _build_prompt(refined_report, ctx_content, plan, feedback=f"Syntax Error: {err}")
                         continue
                         
                     if not check_relevance(refined_report, code, backend, model, api_key=api_key):
+                        notify("generation", f"Context {ctx_num} - Attempt {attempt} - Irrelevant", data={"type": "feedback", "content": "Code deemed irrelevant", "code": code})
                         continue
                         
                     # Success
@@ -150,7 +150,14 @@ class RepGenService:
                     
                     successful_gen = True
                     result["success"] = True
-                    result["files"].append(str(generated_script_path))
+                    
+                    cleaned_code = clean_code_snippet(code, backend, model, api_key=api_key)
+                    
+                    result["files"].append({
+                        "path": str(generated_script_path),
+                        "content": cleaned_code # Return cleaned code
+                    })
+                    notify("generation", "Reproduction Successful", data={"type": "code", "content": cleaned_code, "path": str(generated_script_path)})
                     break
                 
                 if successful_gen:
