@@ -4,7 +4,7 @@
 <head>
     <style>
         body {
-            width: 200px;
+            width: 500px;
             padding: 10px;
             font-family: sans-serif;
         }
@@ -24,7 +24,29 @@
 
 <body>
     <h1>RepGen Assistant</h1>
-    <p>Navigate to a GitHub Issue and look for the "Reproduce with RepGen" button in the sidebar.</p>
+    <h2 id="status" style="font-size: 14px; margin: 5px 0;">Checking...</h2>
+    <p id="title" style="font-weight: bold; color: #333; margin-bottom: 10px;"></p>
+
+    <div id="form" style="display: none; margin-bottom: 10px;">
+        <input type="password" id="apiKey" placeholder="OpenAI API Key"
+            style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+        <input type="text" id="model" placeholder="Model (e.g. gpt-4o)" value="gpt-4o"
+            style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+        <button id="startBtn" style="
+            background-color: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+        ">Start Reproduction</button>
+    </div>
+
+    <div id="result" style="margin-top: 10px; font-size: 12px;"></div>
+    <div id="action"></div>
+    <script src="popup.js"></script>
 </body>
 
 </html>

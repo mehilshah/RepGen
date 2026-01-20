@@ -5,7 +5,8 @@
     "description": "Reproduce Deep Learning Bugs directly from GitHub Issues",
     "permissions": [
         "activeTab",
-        "scripting"
+        "scripting",
+        "storage"
     ],
     "host_permissions": [
         "https://github.com/*",

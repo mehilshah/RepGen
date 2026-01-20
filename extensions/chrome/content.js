@@ -4,8 +4,13 @@
     function injectButton() {
         if (document.getElementById("repgen-btn")) return;
 
-        const sidebar = document.querySelector("#partial-discussion-sidebar");
-        if (!sidebar) return;
+        const sidebar = document.querySelector("#partial-discussion-sidebar") ||
+            document.querySelector(".discussion-sidebar") ||
+            document.querySelector(".layout-sidebar");
+        if (!sidebar) {
+            console.log("RepGen: Sidebar not found");
+            return;
+        }
 
         const container = document.createElement("div");
         container.className = "discussion-sidebar-item";

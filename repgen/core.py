@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 from .retrieval.pipeline import RetrievalPipeline
-from .utils import fetch_content, prepare_repository, checkout_commit, query_llm, create_prompt_refinement, create_prompt_plan, _build_prompt, check_structural_correctness, extract_json_content, check_relevance, clean_context, clean_code_snippet
+from .utils import fetch_content, prepare_repository, checkout_commit, query_llm, create_prompt_refinement, create_prompt_plan, _build_prompt, check_structural_correctness, extract_json_content, check_relevance, clean_context
 
 logger = logging.getLogger("repgen.core")
 
@@ -151,13 +151,11 @@ class RepGenService:
                     successful_gen = True
                     result["success"] = True
                     
-                    cleaned_code = clean_code_snippet(code, backend, model, api_key=api_key)
-                    
                     result["files"].append({
                         "path": str(generated_script_path),
-                        "content": cleaned_code # Return cleaned code
+                        "content": code
                     })
-                    notify("generation", "Reproduction Successful", data={"type": "code", "content": cleaned_code, "path": str(generated_script_path)})
+                    notify("generation", "Reproduction Successful", data={"type": "code", "content": code, "path": str(generated_script_path)})
                     break
                 
                 if successful_gen:
