@@ -2,7 +2,7 @@
 
 This guide explains how to manually verify each component of the RepGen ecosystem.
 
-## 1. 🔌 Verifying the API Server
+## 1. Verifying the API Server
 
 The API is the core of the ecosystem. It must be running for the UI and Extensions to work.
 
@@ -30,7 +30,7 @@ The API is the core of the ecosystem. It must be running for the UI and Extensio
 
 ---
 
-## 2. 🖥️ Verifying the Web UI
+## 2. Verifying the Web UI
 
 The Web UI allows you to start and monitor tasks visually.
 
@@ -53,7 +53,7 @@ The Web UI allows you to start and monitor tasks visually.
 
 ---
 
-## 3. 🧩 Verifying Chrome Extension
+## 3. Verifying Chrome Extension
 
 This extension injects a button into GitHub pages.
 
@@ -66,14 +66,14 @@ This extension injects a button into GitHub pages.
 2. **Test Injection**:
    - Navigate to any GitHub Issue page (e.g., `https://github.com/facebook/react/issues/123`).
    - Look at the **sidebar** on the right.
-   - You should see a purple button: **"⚡ Reproduce with RepGen"**.
+   - You should see a purple button: **"Reproduce with RepGen"**.
 3. **Test Action**:
    - Click the button.
    - It should alert you with a Task ID (ensure API is running!).
 
 ---
 
-## 4. 📝 Verifying VS Code Extension
+## 4. Verifying VS Code Extension
 
 This extension allows running RepGen from within VS Code.
 
@@ -94,7 +94,7 @@ This extension allows running RepGen from within VS Code.
 
 ---
 
-## 5. 🐳 Verifying Docker
+## 5. Verifying Docker
 
 Run the entire stack in a container.
 

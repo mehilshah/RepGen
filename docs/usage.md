@@ -39,8 +39,8 @@ Results are saved to `repgen_results/` by default.
 ```plaintext
 repgen_results/
 └── <project_id>/
-    ├── reproduction_script.py  # ✅ The generated script
-    ├── plan.json               # 📋 Step-by-step plan
-    ├── refined_bug_report.txt  # 📝 Analysis
-    └── context/                # 🧩 Code snippets used
+    ├── reproduction_script.py  # The generated script
+    ├── plan.json               # Step-by-step plan
+    ├── refined_bug_report.txt  # Analysis
+    └── context/                # Code snippets used
 ```
