@@ -450,23 +450,3 @@ def clean_context(context_json_str: str) -> str:
     except Exception as e:
         logger.error(f"Error cleaning context: {e}")
         return "Error parsing context."
-
-def clean_code_snippet(code: str, backend: str, model: str, api_key: Optional[str] = None) -> str:
-    """
-    Uses LLM to clean up the code snippet: remove markdown, comments, etc.
-    """
-    prompt = f"""You are a code cleaner. Your task is to take the following Python code snippet and return ONLY the executable code.
-    
-    Rules:
-    1. Remove all markdown formatting (like ```python ... ```).
-    2. Remove all explanations or conversational text.
-    3. Remove unnecessary comments, keep only essential ones.
-    4. Ensure the code is ready to run.
-    5. Output ONLY the code.
-    
-    Input Code:
-    {code}
-    
-    Cleaned Code:"""
-    
-    return query_llm(prompt, backend, model, api_key=api_key)
