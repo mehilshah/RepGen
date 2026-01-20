@@ -415,3 +415,58 @@ def checkout_commit(repo_path: str, commit: str) -> bool:
 # I'll leave `get_interactive_config` and its helpers in CLI for now.
 # However, `query_ollama` (moved to utils) doesn't use them.
 
+
+# ==========================================
+# CLEANING HELPERS
+# ==========================================
+
+def clean_context(context_json_str: str) -> str:
+    """
+    Parses the context JSON string and returns a user-friendly summary.
+    Removes absolute paths and unnecessary details.
+    """
+    try:
+        data = json.loads(context_json_str)
+        output = []
+        
+        if 'main_file' in data:
+            path = Path(data['main_file']['path']).name
+            output.append(f"Main File: {path}")
+            # output.append("Content (truncated)...")
+            
+        if 'dependencies' in data and data['dependencies']:
+            output.append("\nDependencies:")
+            for dep in data['dependencies']:
+                path = Path(dep['path']).name if 'path' in dep else "Unknown"
+                output.append(f"  - {path}")
+                
+        if 'module' in data:
+            output.append("\nModule Files:")
+            for file in data['module']['files']:
+                path = Path(file['path']).name
+                output.append(f"  - {path}")
+                
+        return "\n".join(output)
+    except Exception as e:
+        logger.error(f"Error cleaning context: {e}")
+        return "Error parsing context."
+
+def clean_code_snippet(code: str, backend: str, model: str, api_key: Optional[str] = None) -> str:
+    """
+    Uses LLM to clean up the code snippet: remove markdown, comments, etc.
+    """
+    prompt = f"""You are a code cleaner. Your task is to take the following Python code snippet and return ONLY the executable code.
+    
+    Rules:
+    1. Remove all markdown formatting (like ```python ... ```).
+    2. Remove all explanations or conversational text.
+    3. Remove unnecessary comments, keep only essential ones.
+    4. Ensure the code is ready to run.
+    5. Output ONLY the code.
+    
+    Input Code:
+    {code}
+    
+    Cleaned Code:"""
+    
+    return query_llm(prompt, backend, model, api_key=api_key)

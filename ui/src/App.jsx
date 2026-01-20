@@ -5,11 +5,13 @@ import { Activity, Terminal, Play, GitBranch, FileCode, CheckCircle, XCircle, Lo
 const API_URL = "http://localhost:8000/api";
 
 function App() {
-    const [bugReport, setBugReport] = useState("");
-    const [repoUrl, setRepoUrl] = useState("");
+    const [bugReport, setBugReport] = useState("https://github.com/lucidrains/vit-pytorch/issues/347");
+    const [repoUrl, setRepoUrl] = useState("https://github.com/lucidrains/vit-pytorch");
     const [backend, setBackend] = useState("openai");
     const [model, setModel] = useState("gpt-4o");
-    const [apiKey, setApiKey] = useState("");
+    const [apiKey, setApiKey] = useState("OPENAI_API_KEY");
+    const [activeTab, setActiveTab] = useState("logs");
+    const [artifacts, setArtifacts] = useState({});
 
     const [taskId, setTaskId] = useState(null);
     const [status, setStatus] = useState("idle"); // idle, running, completed, failed
@@ -22,7 +24,9 @@ function App() {
             setStatus("running");
             setLogs([]);
             setResult([]);
+            setArtifacts({});
             setError(null);
+            setActiveTab("logs");
 
             const res = await axios.post(`${API_URL}/reproduce`, {
                 bug_report: bugReport,
@@ -47,11 +51,13 @@ function App() {
                     const res = await axios.get(`${API_URL}/status/${taskId}`);
                     const data = res.data;
                     setLogs(data.logs || []);
+                    setArtifacts(data.artifacts || {});
 
                     if (data.status === "completed") {
                         setStatus("completed");
                         setResult(data.result || []);
                         clearInterval(interval);
+                        setActiveTab("code"); // Switch to code on completion
                     } else if (data.status === "failed") {
                         setStatus("failed");
                         setError(data.error);
@@ -65,9 +71,17 @@ function App() {
         return () => clearInterval(interval);
     }, [taskId, status]);
 
+    const tabs = [
+        { id: "logs", label: "Logs", icon: <Terminal size={16} /> },
+        { id: "refined_report", label: "Refined Report", icon: <FileCode size={16} /> },
+        { id: "plan", label: "Plan", icon: <Activity size={16} /> },
+        { id: "context", label: "Context", icon: <CheckCircle size={16} /> },
+        { id: "code", label: "Generated Code", icon: <CheckCircle size={16} /> },
+    ];
+
     return (
         <div className="min-h-screen bg-gray-900 text-gray-100 p-8 font-mono">
-            <div className="max-w-4xl mx-auto space-y-8">
+            <div className="max-w-6xl mx-auto space-y-8">
 
                 {/* Header */}
                 <div className="flex items-center space-x-3 border-b border-gray-700 pb-4">
@@ -154,56 +168,121 @@ function App() {
                     <span>{status === "running" ? "Reproducing..." : "Start Reproduction"}</span>
                 </button>
 
-                {/* Status & Logs */}
-                <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-semibold">Live Logs</h2>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide
-                ${status === "completed" ? "bg-green-500/20 text-green-400" :
-                                status === "failed" ? "bg-red-500/20 text-red-400" :
-                                    status === "running" ? "bg-blue-500/20 text-blue-400 animate-pulse" : "bg-gray-700 text-gray-400"}
-              `}>
-                            {status}
-                        </span>
-                    </div>
-
-                    <div className="bg-black/50 rounded-xl p-4 h-64 overflow-y-auto border border-gray-800 font-mono text-sm space-y-1">
-                        {logs.length === 0 && <span className="text-gray-600 italic">Waiting to start...</span>}
-                        {logs.map((log, i) => (
-                            <div key={i} className="text-gray-300 border-l-2 border-gray-700 pl-2">
-                                {log}
-                            </div>
+                {/* Main Content Area with Tabs */}
+                <div className="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden min-h-[500px] flex flex-col">
+                    {/* Tab Navigation */}
+                    <div className="flex border-b border-gray-700 overflow-x-auto">
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center space-x-2 px-6 py-3 text-sm font-medium transition-colors whitespace-nowrap
+                                    ${activeTab === tab.id
+                                        ? "bg-gray-700 text-blue-400 border-b-2 border-blue-400"
+                                        : "text-gray-400 hover:bg-gray-700/50 hover:text-gray-200"}`}
+                            >
+                                {tab.icon}
+                                <span>{tab.label}</span>
+                                {artifacts[tab.id] && <span className="w-2 h-2 rounded-full bg-green-500 ml-1"></span>}
+                            </button>
                         ))}
                     </div>
+
+                    {/* Tab Content */}
+                    <div className="p-6 flex-1 overflow-y-auto">
+
+                        {/* Status Banner */}
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center space-x-2">
+                                <h2 className="text-xl font-semibold text-gray-200">
+                                    {tabs.find(t => t.id === activeTab)?.label}
+                                </h2>
+                                {status === "failed" && error && <span className="text-red-400 text-sm">({error})</span>}
+                            </div>
+
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide
+                                ${status === "completed" ? "bg-green-500/20 text-green-400" :
+                                    status === "failed" ? "bg-red-500/20 text-red-400" :
+                                        status === "running" ? "bg-blue-500/20 text-blue-400 animate-pulse" : "bg-gray-700 text-gray-400"}
+                            `}>
+                                {status}
+                            </span>
+                        </div>
+
+                        {activeTab === "logs" && (
+                            <div className="font-mono text-sm space-y-1">
+                                {logs.length === 0 && <span className="text-gray-600 italic">No logs yet...</span>}
+                                {logs.map((log, i) => (
+                                    <div key={i} className="text-gray-300 border-l-2 border-gray-700 pl-2">
+                                        {log}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {activeTab === "refined_report" && (
+                            <div className="prose prose-invert max-w-none">
+                                {artifacts.refined_report ? (
+                                    <pre className="whitespace-pre-wrap text-sm text-gray-300 bg-black/30 p-4 rounded-lg">
+                                        {artifacts.refined_report}
+                                    </pre>
+                                ) : (
+                                    <div className="text-gray-500 italic flex items-center justify-center h-48">
+                                        Waiting for report refinement...
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === "plan" && (
+                            <div className="prose prose-invert max-w-none">
+                                {artifacts.plan ? (
+                                    <pre className="whitespace-pre-wrap text-sm text-blue-300 bg-blue-900/10 p-4 rounded-lg border border-blue-900/30">
+                                        {artifacts.plan}
+                                    </pre>
+                                ) : (
+                                    <div className="text-gray-500 italic flex items-center justify-center h-48">
+                                        Waiting for plan generation...
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === "context" && (
+                            <div className="prose prose-invert max-w-none">
+                                {artifacts.context ? (
+                                    <pre className="whitespace-pre-wrap text-sm text-gray-300 bg-black/30 p-4 rounded-lg max-h-[600px] overflow-auto">
+                                        {artifacts.context}
+                                    </pre>
+                                ) : (
+                                    <div className="text-gray-500 italic flex items-center justify-center h-48">
+                                        Waiting for context retrieval...
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === "code" && (
+                            <div className="space-y-4">
+                                {artifacts.code ? (
+                                    <>
+                                        <div className="bg-green-900/20 border border-green-800 rounded-lg p-3 flex items-center space-x-2 text-green-400">
+                                            <CheckCircle size={18} />
+                                            <span className="font-mono text-sm">{artifacts.code_path}</span>
+                                        </div>
+                                        <pre className="whitespace-pre-wrap text-sm text-gray-200 bg-black/50 p-4 rounded-lg border border-gray-800 overflow-x-auto">
+                                            {artifacts.code}
+                                        </pre>
+                                    </>
+                                ) : (
+                                    <div className="text-gray-500 italic flex items-center justify-center h-48">
+                                        Waiting for code generation...
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
-
-                {/* Results */}
-                {status === "completed" && (
-                    <div className="bg-green-900/20 border border-green-800 rounded-xl p-6 space-y-4 animate-fade-in">
-                        <div className="flex items-center space-x-3 text-green-400">
-                            <CheckCircle />
-                            <h3 className="text-lg font-bold">Reproduction Successful</h3>
-                        </div>
-                        <div className="space-y-2">
-                            {result.map((file, i) => (
-                                <div key={i} className="flex items-center space-x-2 bg-gray-900 p-3 rounded-lg">
-                                    <FileCode className="text-purple-400" size={20} />
-                                    <span className="text-gray-200">{file}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {status === "failed" && error && (
-                    <div className="bg-red-900/20 border border-red-800 rounded-xl p-6 flex items-start space-x-3 animate-fade-in">
-                        <XCircle className="text-red-500 mt-1" />
-                        <div>
-                            <h3 className="text-lg font-bold text-red-500">Reproduction Failed</h3>
-                            <p className="text-gray-300 mt-1">{error}</p>
-                        </div>
-                    </div>
-                )}
 
             </div>
         </div>

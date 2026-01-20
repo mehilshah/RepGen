@@ -38,9 +38,21 @@ def run_reproduction_task(task_id: str, req: ReproductionRequest):
     
     tasks[task_id]["status"] = "running"
     
-    def progress_cb(stage, msg):
+    def progress_cb(stage, msg, data=None):
         tasks[task_id]["logs"].append(f"[{stage}] {msg}")
         tasks[task_id]["stage"] = stage
+        if data:
+            if "artifacts" not in tasks[task_id]:
+                tasks[task_id]["artifacts"] = {}
+            if data["type"] == "refined_report":
+                tasks[task_id]["artifacts"]["refined_report"] = data["content"]
+            elif data["type"] == "plan":
+                tasks[task_id]["artifacts"]["plan"] = data["content"]
+            elif data["type"] == "code":
+                tasks[task_id]["artifacts"]["code"] = data["content"]
+                tasks[task_id]["artifacts"]["code_path"] = data["path"]
+            elif data["type"] == "context":
+                tasks[task_id]["artifacts"]["context"] = data["content"] # Maybe accumulate? For now, last one.
 
     try:
         result = service.run_reproduction(
@@ -55,7 +67,7 @@ def run_reproduction_task(task_id: str, req: ReproductionRequest):
         
         if result["success"]:
             tasks[task_id]["status"] = "completed"
-            tasks[task_id]["result"] = result["files"]
+            tasks[task_id]["result"] = result["files"] # This will now be a list of dicts {path, content}
         else:
             tasks[task_id]["status"] = "failed"
             tasks[task_id]["error"] = result["error"]
@@ -71,6 +83,7 @@ async def start_reproduction(req: ReproductionRequest, background_tasks: Backgro
         "status": "pending",
         "stage": "init",
         "logs": [],
+        "artifacts": {},
         "result": None,
         "error": None
     }
