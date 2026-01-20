@@ -2,50 +2,281 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
     <style>
+        :root {
+            --primary: #6366f1;
+            /* Indigo 500 */
+            --primary-hover: #4f46e5;
+            /* Indigo 600 */
+            --bg: #f9fafb;
+            /* Gray 50 */
+            --surface: #ffffff;
+            --text-main: #111827;
+            /* Gray 900 */
+            --text-muted: #6b7280;
+            /* Gray 500 */
+            --border: #e5e7eb;
+            /* Gray 200 */
+            --success: #10b981;
+            --error: #ef4444;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
         body {
-            width: 500px;
-            padding: 10px;
-            font-family: sans-serif;
+            width: 450px;
+            margin: 0;
+            padding: 20px;
+            font-family: var(--font-family);
+            background-color: var(--bg);
+            color: var(--text-main);
+            box-sizing: border-box;
         }
 
-        h1 {
-            font-size: 16px;
-            margin: 0 0 10px;
-            color: #8b5cf6;
-        }
-
+        /* typography */
+        h1,
+        h2,
+        h3,
         p {
+            margin: 0;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .brand {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand svg {
+            color: var(--primary);
+        }
+
+        .status-badge {
             font-size: 12px;
-            color: #666;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background-color: var(--border);
+            /* Default */
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge.active {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+
+        /* Blue */
+        .status-badge.success {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        /* Green */
+        .status-badge.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Red */
+        .status-badge.running {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+
+        /* Amber */
+
+        /* Content Card */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            margin-bottom: 16px;
+        }
+
+        .issue-title {
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 1.4;
+            color: var(--text-main);
+        }
+
+        .issue-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-main);
+            margin-bottom: 6px;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+            box-sizing: border-box;
+            /* Crucial for full width */
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background-color: white;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            margin-top: 8px;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg);
+        }
+
+        /* Result Area */
+        #result-container {
+            display: none;
+            /* Hidden by default */
+        }
+
+        textarea.code-block {
+            width: 100%;
+            height: 250px;
+            padding: 12px;
+            background-color: #1e293b;
+            /* Slate 800 */
+            color: #e2e8f0;
+            /* Slate 200 */
+            border-radius: 6px;
+            border: none;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+            resize: none;
+            box-sizing: border-box;
+        }
+
+        .progress-log {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .block {
+            display: block !important;
         }
     </style>
 </head>
 
 <body>
-    <h1>RepGen Assistant</h1>
-    <h2 id="status" style="font-size: 14px; margin: 5px 0;">Checking...</h2>
-    <p id="title" style="font-weight: bold; color: #333; margin-bottom: 10px;"></p>
-
-    <div id="form" style="display: none; margin-bottom: 10px;">
-        <input type="password" id="apiKey" placeholder="OpenAI API Key"
-            style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
-        <input type="text" id="model" placeholder="Model (e.g. gpt-4o)" value="gpt-4o"
-            style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
-        <button id="startBtn" style="
-            background-color: #8b5cf6;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            width: 100%;
-            font-weight: bold;
-        ">Start Reproduction</button>
+    <div class="header">
+        <div class="brand">
+            <!-- Icon -->
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+            </svg>
+            RepGen
+        </div>
+        <div id="statusBadge" class="status-badge">Waiting</div>
     </div>
 
-    <div id="result" style="margin-top: 10px; font-size: 12px;"></div>
-    <div id="action"></div>
+    <!-- Issue Context Card -->
+    <div id="issueCard" class="card hidden">
+        <div id="issueTitle" class="issue-title">Loading Issue...</div>
+        <div class="issue-meta">Target Issue</div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="card hidden" style="text-align: center; color: var(--text-muted);">
+        <p>Navigate to a GitHub Issue to start.</p>
+    </div>
+
+    <!-- Input Form -->
+    <div id="setupForm" class="hidden">
+        <div class="form-group">
+            <label>OpenAI API Key</label>
+            <input type="password" id="apiKey" placeholder="sk-...">
+        </div>
+        <div class="form-group">
+            <label>Model</label>
+            <input type="text" id="model" value="gpt-4o" placeholder="gpt-4o">
+        </div>
+        <button id="startBtn" class="btn-primary">Start Reproduction</button>
+        <div id="errorMsg" style="color: var(--error); font-size: 12px; margin-top: 8px; text-align: center;"></div>
+    </div>
+
+    <!-- Running/Result Area -->
+    <div id="resultArea" class="hidden">
+        <textarea id="codeOutput" class="code-block hidden"></textarea>
+        <div id="progressLog" class="progress-log"></div>
+
+        <div id="actionButtons" class="hidden">
+            <button id="copyBtn" class="btn-secondary">Copy Code</button>
+            <button id="resetBtn" class="btn-secondary">Start New Reproduction</button>
+        </div>
+    </div>
+
     <script src="popup.js"></script>
 </body>
 
