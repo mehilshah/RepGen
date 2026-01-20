@@ -17,7 +17,41 @@
                 "command": "repgen.reproduce",
                 "title": "RepGen: Reproduce Bug"
             }
-        ]
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "repgen-sidebar-view",
+                    "title": "RepGen",
+                    "icon": "$(bug)"
+                }
+            ]
+        },
+        "views": {
+            "repgen-sidebar-view": [
+                {
+                    "type": "webview",
+                    "id": "repgen-sidebar",
+                    "name": "RepGen Automation",
+                    "icon": "$(bug)"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "RepGen",
+            "properties": {
+                "repgen.apiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Your API Key for LLM Backend (e.g. OpenAI)"
+                },
+                "repgen.model": {
+                    "type": "string",
+                    "default": "gpt-4o",
+                    "description": "Model to use for reproduction (e.g. gpt-4o, claude-3-5-sonnet)"
+                }
+            }
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",
