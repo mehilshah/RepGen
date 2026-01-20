@@ -1,9 +1,10 @@
 # Use official lightweight Python image
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 # Install system dependencies (git is needed for cloning repos)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -15,8 +16,6 @@ COPY . .
 # Install the package
 RUN pip install --no-cache-dir .
 
-# Default command
-# Expose API port
 EXPOSE 8000
 
 # Run API Server by default
