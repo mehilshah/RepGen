@@ -13,3 +13,8 @@ rich
 mkdocs
 mkdocs-material
 watchfiles
+black
+isort
+mypy
+flake8
+pre-commit
