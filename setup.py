@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 setup(
     name="repgen",
@@ -19,7 +19,7 @@ setup(
         "rich",
         "fastapi",
         "uvicorn",
-        "pydantic"
+        "pydantic",
     ],
     entry_points={
         "console_scripts": [

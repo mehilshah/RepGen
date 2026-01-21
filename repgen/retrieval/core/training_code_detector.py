@@ -1,16 +1,15 @@
 import ast
+import logging
+import os
 from pathlib import Path
-from typing import List, Dict, Tuple, Any
-import numpy as np
+from typing import Any, Dict, List, Tuple
+
+import torch
 from sentence_transformers import CrossEncoder
 from transformers import AutoTokenizer
-import torch
-import os
-import logging
 
 logger = logging.getLogger(__name__)
 
-import ast
 
 class TrainingLoopVisitor(ast.NodeVisitor):
     """
@@ -20,15 +19,15 @@ class TrainingLoopVisitor(ast.NodeVisitor):
     - PyTorch (optimizer steps in loops, DataLoader usage)
     - PyTorch Lightning (training_step method)
     """
-    
+
     def __init__(self):
         # Framework flags
         self.found_training = False
-        
+
         # Context tracking
-        self.loop_depth = 0               # Track nested loops
-        self.gradient_tape_depth = 0       # Track GradientTape contexts
-        self.current_class = None          # Track class context
+        self.loop_depth = 0  # Track nested loops
+        self.gradient_tape_depth = 0  # Track GradientTape contexts
+        self.current_class = None  # Track class context
 
     # Context management ------------------------------------------------------
     def visit_ClassDef(self, node):
@@ -79,11 +78,11 @@ class TrainingLoopVisitor(ast.NodeVisitor):
             # High-level APIs
             if node.func.attr in {"fit", "fit_generator", "train_on_batch"}:
                 self.found_training = True
-            
+
             # Optimizer methods
             if node.func.attr in {"apply_gradients", "minimize"}:
                 self.found_training = True
-            
+
             # GradientTape context patterns
             if self.gradient_tape_depth > 0:
                 if node.func.attr in {"gradient", "watch"}:
@@ -95,15 +94,17 @@ class TrainingLoopVisitor(ast.NodeVisitor):
             # Core training methods
             if node.func.attr in {"backward", "step", "zero_grad"}:
                 self.found_training = True
-                
+
             # Loss calculation patterns
-            if node.func.attr in {"item", "backward"} and \
-                self._is_loss_node(node.func.value):
+            if node.func.attr in {"item", "backward"} and self._is_loss_node(
+                node.func.value
+            ):
                 self.found_training = True
 
             # DataLoader patterns
-            if node.func.attr in {"to", "cuda"} and \
-                self._is_dataloader_node(node.func.value):
+            if node.func.attr in {"to", "cuda"} and self._is_dataloader_node(
+                node.func.value
+            ):
                 self.found_training = True
 
     # Helper methods -----------------------------------------------------------
@@ -112,9 +113,8 @@ class TrainingLoopVisitor(ast.NodeVisitor):
         if isinstance(node, ast.Call):
             func = node.func
             return (
-                (isinstance(func, ast.Attribute) and func.attr == "GradientTape") or
-                (isinstance(func, ast.Name) and func.id == "GradientTape")
-            )
+                isinstance(func, ast.Attribute) and func.attr == "GradientTape"
+            ) or (isinstance(func, ast.Name) and func.id == "GradientTape")
         return False
 
     def _is_loss_node(self, node):
@@ -140,12 +140,13 @@ class TrainingLoopVisitor(ast.NodeVisitor):
             self.found_training = True
         self.generic_visit(node)
 
+
 class TrainingCodeDetector:
     def __init__(self, config):
         self.config = config
         self.reranker = CrossEncoder(config.RERANKER_MODEL)
         self.tokenizer = AutoTokenizer.from_pretrained(config.RERANKER_MODEL)
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.reranker.to(self.device)
 
     def contains_training(self, file_path: Path) -> bool:
@@ -165,71 +166,75 @@ class TrainingCodeDetector:
     def _get_all_files(self, module_report: Dict[str, Any]) -> List[Path]:
         """Get all Python files from modules in the report."""
         # --- MODIFICATION: Ablation: No Module-Centric Partitioning ---
-        files = set() # Use set to avoid duplicates
+        files = set()  # Use set to avoid duplicates
 
-        files = set() # Use set to avoid duplicates
+        files = set()  # Use set to avoid duplicates
 
         # Original: Walk all files in the retrieved modules' directories
-        for module in module_report['modules']:
-            module_path = self.config.CODE_DIR / module['module']
+        for module in module_report["modules"]:
+            module_path = self.config.CODE_DIR / module["module"]
             if not module_path.exists():
                 continue
-                
+
             for root, _, filenames in os.walk(module_path):
                 for filename in filenames:
-                    if filename.endswith('.py'):
+                    if filename.endswith(".py"):
                         files.add(Path(root) / filename)
-        
+
         return list(files)
 
-    def _rank_files(self, files: List[Path], bug_report: str) -> List[Tuple[Path, float]]:
+    def _rank_files(
+        self, files: List[Path], bug_report: str
+    ) -> List[Tuple[Path, float]]:
         """Rank files by relevance to the bug report."""
         if not files:
             return []
-            
+
         # Tokenize with proper truncation
         features = self.tokenizer(
             [bug_report[:100000]] * len(files),
-            [file.read_text(encoding='utf-8')[:100000] for file in files],
+            [file.read_text(encoding="utf-8")[:100000] for file in files],
             padding=True,
-            truncation='longest_first',
+            truncation="longest_first",
             max_length=512,
-            return_tensors="pt"
+            return_tensors="pt",
         ).to(self.device)
-        
+
         # Run cross-encoder
         with torch.no_grad():
             scores = self.reranker(**features).logits.squeeze().cpu().numpy()
-        
+
         # Normalize scores
         if len(scores) > 1:
             scores = (scores - scores.min()) / (scores.max() - scores.min() + 1e-8)
-        
+
         return sorted(zip(files, scores), key=lambda x: x[1], reverse=True)
 
-    def detect_training_code(self, module_report: Dict[str, Any], bug_report_path: Path) -> Dict[str, Any]:
+    def detect_training_code(
+        self, module_report: Dict[str, Any], bug_report_path: Path
+    ) -> Dict[str, Any]:
         """Detect and rank training-related code."""
-        bug_report = bug_report_path.read_text(encoding='utf-8')
+        bug_report = bug_report_path.read_text(encoding="utf-8")
         all_files = self._get_all_files(module_report)
-        
+
         training_files = []
         training_files = []
         for file in all_files:
             if self.contains_training(file):
                 training_files.append(file)
-        
+
         # Original ranking logic
         ranked_files = self._rank_files(training_files, bug_report)
         # --- END MODIFICATION ---
-        
+
         return {
-            'bug_report': module_report['bug_report'],
-            'training_files': [
+            "bug_report": module_report["bug_report"],
+            "training_files": [
                 {
-                    'file': str(file.relative_to(self.config.CODE_DIR)),
-                    'score': float(score),
-                    'contains_training': True
+                    "file": str(file.relative_to(self.config.CODE_DIR)),
+                    "score": float(score),
+                    "contains_training": True,
                 }
                 for file, score in ranked_files
-            ]
+            ],
         }

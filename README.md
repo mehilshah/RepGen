@@ -1,10 +1,11 @@
-# RepGen - Automated Bug Reproduction in AI-Powered Software
+# RepGen - Automated Bug Reproduction
 
 <div align="center">
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Active%20Research-4CAF50?style=flat-square" />
-  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white" />
+ <img src="https://img.shields.io/github/actions/workflow/status/mehilshah/RepGen/ci.yml?branch=main&label=Build&style=flat-square&logo=github" />
   <img src="https://img.shields.io/badge/Execution-Dockerized-2496ED?style=flat-square&logo=docker&logoColor=white" />
   <img src="https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square" />
 </p>
@@ -13,7 +14,6 @@
 
 </div>
 
----
 
 ## Overview
 
