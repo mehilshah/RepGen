@@ -26,7 +26,7 @@ setup(
             "repgen=repgen.cli:main",
         ],
     },
-    author="Mehil B. Shah, Mohammad Masudur Rahman, Foutse Khomh",
+    author="Mehil B. Shah",
     description="Automated Deep Learning Bug Reproduction with LLMs",
     url="https://github.com/mehilshah/RepGen",
     long_description=open("README.md").read(),
