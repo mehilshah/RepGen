@@ -1,14 +1,45 @@
-[tool.black]
-line-length = 88
-target-version = ['py312']
-include = '\.pyi?$'
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[project]
+name = "repgen"
+version = "0.1.0"
+description = "Automated reproduction generation for bug reports using LLMs"
+readme = "README.md"
+authors = [
+  { name = "Mehil Shah", email = "shahmehil@dal.ca" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "annoy",
+    "numpy",
+    "pylint",
+    "rank_bm25",
+    "requests",
+    "scikit_learn",
+    "sentence_transformers",
+    "torch",
+    "transformers",
+    "pandas",
+    "openai",
+    "rich",
+    "mkdocs",
+    "mkdocs-material",
+    "watchfiles",
+    "black",
+    "isort",
+    "mypy",
+    "flake8",
+    "pre-commit",
+    "rich-argparse",
+]
 
-[tool.mypy]
-python_version = "3.12"
-warn_return_any = true
-warn_unused_configs = true
-ignore_missing_imports = true
+[project.urls]
+"Homepage" = "https://github.com/mehilshah/RepGen"
+"Bug Tracker" = "https://github.com/mehilshah/RepGen/issues"
