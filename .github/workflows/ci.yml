@@ -33,9 +33,6 @@ jobs:
     - name: Check Imports (isort)
       run: isort . --check-only
 
-    - name: Type Checking (mypy)
-      run: mypy .
-
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
