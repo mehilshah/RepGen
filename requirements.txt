@@ -18,3 +18,4 @@ isort
 mypy
 flake8
 pre-commit
+rich-argparse
