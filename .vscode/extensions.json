@@ -1,8 +1,0 @@
-{
-    "recommendations": [
-        "SonarSource.sonarlint-vscode",
-        "ms-python.python",
-        "ms-python.black-formatter",
-        "ms-python.isort"
-    ]
-}

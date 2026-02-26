@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square" />
 </p>
 
-[Features](#features) • [Quick Start](#quick-start) • [VS Code](#vs-code-extension) • [Documentation](#documentation) • [Paper](https://arxiv.org/abs/2512.14990)
+[Features](#features) • [Quick Start](#quick-start) • [Documentation](#documentation) • [Paper](https://arxiv.org/abs/2512.14990)
 
 </div>
 
@@ -31,7 +31,6 @@ Ideally suited for Deep Learning libraries, RepGen automates the tedious first s
 - **Remote Input Handling**:
   - Direct support for **GitHub Issue URLs** (fetches content via API).
   - Direct support for **Git Repository URLs** (clones automatically to temp workspace).
-- **Professional VS Code Extension**: A fully integrated sidebar to run reproductions directly in your editor.
 - **Docker Ready**: Full containerization for easy deployment.
 
 ---
@@ -69,26 +68,7 @@ pip install -e .
 repgen
 ```
 
----
 
-## VS Code Extension
-
-RepGen includes a premium VS Code extension for a seamless workflow.
-
-### Features
-- **Persistent Sidebar**: Stays active while you work.
-- **Direct Code Display**: Generated reproduction scripts appear directly in the sidebar.
-- **"Open in Editor"**: One-click to open generated code in a new editor tab for review.
-- **Status Tracking**:  Real-time progress indicators.
-
-### Installation
-1. Navigate to `extensions/vscode`.
-2. Run `npm install` && `npm run compile`.
-3. Open the folder in VS Code and press `F5` to launch the Extension Development Host.
-
----
-
-## Ecosystem
 
 ### REST API
 The core engine runs as a FastAPI service.
@@ -99,10 +79,6 @@ The core engine runs as a FastAPI service.
 A modern, React-based UI to manage reproduction tasks visually.
 - **Location**: `ui/`
 - **Start**: `cd ui && npm install && npm run dev`
-
-### Browser Extension
-Injects a "Reproduce" button directly into GitHub Issues.
-- **Location**: `extensions/chrome/`
 
 ---
 
