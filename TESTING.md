@@ -51,50 +51,7 @@ The Web UI allows you to start and monitor tasks visually.
    - Click **Start Reproduction**.
    - Verify that the status changes to "Running" and logs appear in the console window.
 
----
-
-## 3. Verifying Chrome Extension
-
-This extension injects a button into GitHub pages.
-
-### Steps
-1. **Load Extension**:
-   - Open Chrome and go to `chrome://extensions`.
-   - Toggle **Developer Mode** (top right).
-   - Click **Load unpacked**.
-   - Select the `extensions/chrome` directory from this project.
-2. **Test Injection**:
-   - Navigate to any GitHub Issue page (e.g., `https://github.com/facebook/react/issues/123`).
-   - Look at the **sidebar** on the right.
-   - You should see a purple button: **"Reproduce with RepGen"**.
-3. **Test Action**:
-   - Click the button.
-   - It should alert you with a Task ID (ensure API is running!).
-
----
-
-## 4. Verifying VS Code Extension
-
-This extension allows running RepGen from within VS Code.
-
-### Steps
-1. **Open Extension Project**:
-   - Open the `extensions/vscode` folder in a new VS Code window.
-2. **Install Dependencies**:
-   ```bash
-   npm install
-   ```
-3. **Debug**:
-   - Press `F5` to open a new "Extension Development Host" window.
-4. **Trigger Command**:
-   - In the new window, press `Cmd+Shift+P` (Mac) or `Ctrl+Shift+P` (Windows).
-   - Type `RepGen: Reproduce Bug`.
-   - Enter the requested URLs.
-   - Verify that a progress notification appears in the status bar.
-
----
-
-## 5. Verifying Docker
+## 3. Verifying Docker
 
 Run the entire stack in a container.
 

@@ -19,3 +19,4 @@ mypy
 flake8
 pre-commit
 rich-argparse
+fastapi
