@@ -3,7 +3,7 @@
     "type": "module",
     "version": "0.0.0",
     "scripts": {
-        "dev": "vite --host 0.0.0.0 --port 5173",
+        "dev": "vite --host 0.0.0.0",
         "build": "vite build",
         "preview": "vite preview",
         "start": "pm2 start ecosystem.config.cjs",
@@ -17,7 +17,8 @@
         "lucide-react": "^0.294.0",
         "pm2": "^6.0.14",
         "react": "^18.2.0",
-        "react-dom": "^18.2.0"
+        "react-dom": "^18.2.0",
+        "react-router-dom": "^6.30.3"
     },
     "devDependencies": {
         "@types/react": "^18.2.37",

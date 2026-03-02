@@ -2,7 +2,7 @@ server {
     listen 80;
     server_name raiselab.research.cs.dal.ca;
 
-    # Note: If you use Let's Encrypt for SSL, certbot will automatically 
+    # Note: If you use Let's Encrypt for SSL, certbot will automatically
     # add the SSL directives and configure HTTP to HTTPS redirection here.
 
     # Proxy requests for the Vite UI (React app) under /~repgen/
