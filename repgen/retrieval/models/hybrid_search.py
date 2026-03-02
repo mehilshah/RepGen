@@ -18,6 +18,8 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
 
+_MODEL_CACHE = {}
+
 class HybridSearchIndex:
     def __init__(
         self,
@@ -26,10 +28,20 @@ class HybridSearchIndex:
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         config: Optional[Any] = None,
     ):
+        global _MODEL_CACHE
         self.device = device
-        self.encoder = SentenceTransformer(embedding_model, device=device)
-        self.cross_encoder = CrossEncoder(reranker_model, device=device)
-        self.tokenizer = AutoTokenizer.from_pretrained(reranker_model)
+        
+        if embedding_model not in _MODEL_CACHE:
+            _MODEL_CACHE[embedding_model] = SentenceTransformer(embedding_model, device=device)
+        self.encoder = _MODEL_CACHE[embedding_model]
+        
+        if reranker_model not in _MODEL_CACHE:
+            _MODEL_CACHE[reranker_model] = (
+                CrossEncoder(reranker_model, device=device),
+                AutoTokenizer.from_pretrained(reranker_model)
+            )
+        self.cross_encoder, self.tokenizer = _MODEL_CACHE[reranker_model]
+        
         self.max_seq_length = 512
         self.bm25 = None
         self.embeddings = None

@@ -1,4 +1,5 @@
 import uuid
+from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -7,7 +8,22 @@ from pydantic import BaseModel
 
 from .core import RepGenService
 
-app = FastAPI(title="RepGen API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Preloading models...")
+    from .retrieval.config import Config
+    from .retrieval.models.hybrid_search import HybridSearchIndex
+    
+    config = Config(repo_path=".", bug_report_path="requirements.txt", output_dir="./repgen_results")
+    _ = HybridSearchIndex(
+        embedding_model=config.EMBEDDING_MODEL,
+        reranker_model=config.RERANKER_MODEL,
+        config=None,
+    )
+    print("Models preloaded successfully.")
+    yield
+
+app = FastAPI(title="RepGen API", lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
