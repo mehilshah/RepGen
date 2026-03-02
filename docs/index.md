@@ -23,7 +23,6 @@ Ideally suited for Deep Learning libraries, RepGen automates the tedious first s
 
 - **Smart Retrieval**: Uses hybrid search (BM25 + Semantic) to find relevant code snippets and training loops for context.
 - **Multi-Backend Support**: Seamlessly switch between LLM providers:
-  - **Ollama**: Run locally with models like `qwen2.5-coder`, `llama3`, or `mistral`.
   - **OpenAI**: Utilize `gpt-4o` and `gpt-3.5-turbo` for high-precision generation.
   - **Gemini**: Leverage Google's multimodal capabilities.
   - **Claude**: Use Anthropic's reasoning models.

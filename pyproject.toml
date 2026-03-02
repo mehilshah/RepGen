@@ -43,3 +43,6 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/mehilshah/RepGen"
 "Bug Tracker" = "https://github.com/mehilshah/RepGen/issues"
+
+[tool.isort]
+profile = "black"
