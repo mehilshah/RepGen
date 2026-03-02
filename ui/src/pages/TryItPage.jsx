@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Activity, CheckCircle, FileCode, GitBranch, Loader, Play, Terminal } from "lucide-react";
 
-const API_URL = "http://localhost:8000/api";
+const API_URL = import.meta.env.VITE_API_URL || "/~repgen/api/api";
 
 function TryItPage() {
     const [bugReport, setBugReport] = useState("");
@@ -229,10 +229,6 @@ function TryItPage() {
                         <div className="space-y-4">
                             {artifacts.code ? (
                                 <>
-                                    <div className="success-banner">
-                                        <CheckCircle size={18} />
-                                        <span className="font-mono text-sm">{artifacts.code_path}</span>
-                                    </div>
                                     <pre className="block-pre overflow-x-auto">{artifacts.code}</pre>
                                 </>
                             ) : (
