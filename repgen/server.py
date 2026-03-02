@@ -72,7 +72,6 @@ def run_reproduction_task(task_id: str, req: ReproductionRequest):
                 tasks[task_id]["artifacts"]["plan"] = data["content"]
             elif data["type"] == "code":
                 tasks[task_id]["artifacts"]["code"] = data["content"]
-                tasks[task_id]["artifacts"]["code_path"] = data["path"]
             elif data["type"] == "context":
                 tasks[task_id]["artifacts"]["context"] = data[
                     "content"

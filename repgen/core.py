@@ -10,6 +10,7 @@ from .utils import (
     check_relevance,
     check_structural_correctness,
     checkout_commit,
+    checkout_to_date,
     clean_context,
     create_prompt_plan,
     create_prompt_refinement,
@@ -64,13 +65,17 @@ class RepGenService:
         try:
             # 1. Prepare Inputs
             notify("setup", "Fetching inputs...")
-            bug_report_content = fetch_content(bug_report_source)
+            bug_report_content, created_at = fetch_content(bug_report_source)
             local_repo_path = prepare_repository(repo_source)
 
             if commit:
                 notify("setup", f"Checking out commit {commit}...")
                 if not checkout_commit(local_repo_path, commit):
                     raise RuntimeError("Failed to checkout commit")
+            elif created_at:
+                notify("setup", f"Checking out repository state from {created_at}...")
+                if not checkout_to_date(local_repo_path, created_at):
+                    logger.warning(f"Failed to checkout date {created_at}, continuing with current state.")
 
             # 2. Initialize Pipeline
             # Create a unique project ID/folder
@@ -140,7 +145,7 @@ class RepGenService:
                     f"Context {ctx_num} Loaded",
                     data={
                         "type": "context",
-                        "content": clean_context(ctx_content),
+                        "content": ctx_content,
                         "index": idx,
                     },
                 )
@@ -215,7 +220,6 @@ class RepGenService:
                         data={
                             "type": "code",
                             "content": code,
-                            "path": str(generated_script_path),
                         },
                     )
                     break

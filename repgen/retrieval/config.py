@@ -11,8 +11,18 @@ class Config:
         self.BUG_REPORT_FILE = Path(bug_report_path).resolve()
         self.OUTPUT_DIR = Path(output_dir).resolve()
 
-        # Unique project identifier based on repo name and bug report name
-        self.PROJECT_ID = f"{self.CODE_DIR.name}_{self.BUG_REPORT_FILE.stem}"
+        # Get current commit hash for cache invalidation
+        try:
+            import subprocess
+            commit_hash = subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"], 
+                cwd=self.CODE_DIR, text=True
+            ).strip()
+        except Exception:
+            commit_hash = "unknown_commit"
+
+        # Unique project identifier based on repo name, bug report name, and commit
+        self.PROJECT_ID = f"{self.CODE_DIR.name}_{self.BUG_REPORT_FILE.stem}_{commit_hash}"
         self.PROJECT_DIR = self.OUTPUT_DIR / self.PROJECT_ID
 
         # --- Base paths for outputs ---

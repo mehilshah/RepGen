@@ -46,7 +46,7 @@ logger = logging.getLogger("repgen.utils")
 # ==========================================
 
 
-def fetch_content(source: str) -> str:
+def fetch_content(source: str) -> tuple[str, Optional[str]]:
     """
     Fetches content from a local file or a URL (e.g., GitHub Issue).
     """
@@ -76,7 +76,8 @@ def fetch_content(source: str) -> str:
                 data = response.json()
                 title = data.get("title", "")
                 body = data.get("body", "")
-                return f"Title: {title}\n\nBody:\n{body}"
+                created_at = data.get("created_at")
+                return f"Title: {title}\n\nBody:\n{body}", created_at
             except Exception as e:
                 console.log(f"[error]Error fetching GitHub issue: {e}[/error]")
                 raise
@@ -86,7 +87,7 @@ def fetch_content(source: str) -> str:
             try:
                 response = requests.get(source)
                 response.raise_for_status()
-                return response.text
+                return response.text, None
             except Exception as e:
                 console.log(f"[error]Error fetching URL: {e}[/error]")
                 raise
@@ -96,7 +97,7 @@ def fetch_content(source: str) -> str:
         path = Path(source)
         if not path.exists():
             raise FileNotFoundError(f"Local file not found: {path}")
-        return path.read_text()
+        return path.read_text(), None
 
 
 def prepare_repository(
@@ -418,7 +419,7 @@ def check_structural_correctness(code: str) -> tuple[bool, str]:
 
 
 def extract_json_content(text):
-    pattern = r"```(?:json)?\s*(.*?)\s*```"
+    pattern = r"```(?:[a-zA-Z0-9_\-+]+)?\s*(.*?)\s*```"
     match = re.search(pattern, text, re.DOTALL)
     if match:
         return match.group(1)
@@ -474,6 +475,37 @@ def checkout_commit(repo_path: str, commit: str) -> bool:
         return False
     except Exception as e:
         logger.error(f"Error during git checkout: {e}")
+        return False
+
+
+def checkout_to_date(repo_path: str, date_str: str) -> bool:
+    try:
+        logger.info(f"Finding latest commit before {date_str}")
+        if not (Path(repo_path) / ".git").exists():
+            logger.error(f"Not a git repository: {repo_path}")
+            return False
+
+        # Find commit hash across all branches
+        result = subprocess.run(
+            ["git", "rev-list", "-n", "1", f"--before={date_str}", "--all"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        commit_hash = result.stdout.strip()
+            
+        if not commit_hash:
+            logger.error(f"Could not find any commit before date {date_str}")
+            return False
+
+        return checkout_commit(repo_path, commit_hash)
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Git rev-list failed: {e.stderr.strip()}")
+        return False
+    except Exception as e:
+        logger.error(f"Error checking out date: {e}")
         return False
 
 
