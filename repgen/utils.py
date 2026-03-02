@@ -150,27 +150,6 @@ def prepare_repository(
 # ==========================================
 
 
-def query_ollama(prompt: str, model: str) -> str:
-    try:
-        cmd = ["ollama", "run", model]
-        process = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-        )
-        stdout, stderr = process.communicate(input=prompt)
-        if process.returncode != 0:
-            logger.error(f"Ollama Error ({model}): {stderr.strip()}")
-            return ""
-        return stdout.strip()
-    except Exception as e:
-        logger.error(f"Ollama execution failed: {e}")
-        return ""
-
-
 def query_openai(
     prompt: str,
     model: str = "gpt-4o",
@@ -276,9 +255,7 @@ def query_claude(
 def query_llm(
     prompt: str, backend: str, model: str, api_key: Optional[str] = None
 ) -> str:
-    if backend == "ollama":
-        return query_ollama(prompt, model)
-    elif backend == "openai":
+    if backend == "openai":
         return query_openai(prompt, model, api_key=api_key)
     elif backend == "gemini":
         return query_gemini(prompt, model, api_key=api_key)
@@ -498,19 +475,6 @@ def checkout_commit(repo_path: str, commit: str) -> bool:
     except Exception as e:
         logger.error(f"Error during git checkout: {e}")
         return False
-
-
-# Export check_ollama_status and ensure_ollama_model if needed by others
-# But for now they seem local to CLI or used by query_llm (indirectly? No, interactive config uses them)
-# Actually interactive config uses them. Let's move them too so interactive config in CLI can use them?
-# Or keep them in CLI. query_llm calls `query_ollama` which just runs `ollama run`.
-# `check_ollama_status` and `ensure_ollama_model` are helper checking functions.
-# They are only used in `get_interactive_config` which is in CLI.
-# So I will keep them (or move them if I move `get_interactive_config` later, but for now `get_interactive_config` is in CLI).
-# Wait, `get_interactive_config` IS in CLI in my plan. So `check_ollama_status` and `ensure_ollama_model` should stay in CLI or be imported.
-# It's cleaner to have them in utility if they are general, but they are used for interactive setup.
-# I'll leave `get_interactive_config` and its helpers in CLI for now.
-# However, `query_ollama` (moved to utils) doesn't use them.
 
 
 # ==========================================

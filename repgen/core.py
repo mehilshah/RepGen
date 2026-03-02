@@ -44,7 +44,7 @@ class RepGenService:
         Args:
             bug_report_source: URL or path to bug report
             repo_source: URL or path to repository
-            backend: LLM backend (ollama, openai, etc)
+            backend: LLM backend (openai, gemini, claude)
             model: Model name
             commit: Optional commit hash
             max_attempts: Max retry attempts per context

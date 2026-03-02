@@ -6,8 +6,8 @@ from .core import RepGenService
 def reproduce(
     bug_report_source: str,
     repo_source: str,
-    backend: str = "openai",
-    model: str = "gpt-4o",
+    backend: str,
+    model: str,
     api_key: Optional[str] = None,
     commit: Optional[str] = None,
     output_dir: str = "./repgen_results",
@@ -18,8 +18,8 @@ def reproduce(
     Args:
         bug_report_source: URL or path to the bug report.
         repo_source: URL or path to the repository.
-        backend: The LLM backend to use (default: "openai").
-        model: The model name to use (default: "gpt-4o").
+        backend: The LLM backend to use (openai, gemini, claude).
+        model: The model name to use.
         api_key: API key for the backend (optional).
         commit: Specific commit hash to checkout (optional).
         output_dir: Directory to store intermediate artifacts (default: "./repgen_results").
