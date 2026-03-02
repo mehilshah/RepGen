@@ -20,6 +20,7 @@ logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
 _MODEL_CACHE = {}
 
+
 class HybridSearchIndex:
     def __init__(
         self,
@@ -30,18 +31,20 @@ class HybridSearchIndex:
     ):
         global _MODEL_CACHE
         self.device = device
-        
+
         if embedding_model not in _MODEL_CACHE:
-            _MODEL_CACHE[embedding_model] = SentenceTransformer(embedding_model, device=device)
+            _MODEL_CACHE[embedding_model] = SentenceTransformer(
+                embedding_model, device=device
+            )
         self.encoder = _MODEL_CACHE[embedding_model]
-        
+
         if reranker_model not in _MODEL_CACHE:
             _MODEL_CACHE[reranker_model] = (
                 CrossEncoder(reranker_model, device=device),
-                AutoTokenizer.from_pretrained(reranker_model)
+                AutoTokenizer.from_pretrained(reranker_model),
             )
         self.cross_encoder, self.tokenizer = _MODEL_CACHE[reranker_model]
-        
+
         self.max_seq_length = 512
         self.bm25 = None
         self.embeddings = None

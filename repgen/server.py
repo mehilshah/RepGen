@@ -11,13 +11,16 @@ from starlette.staticfiles import StaticFiles
 
 from .core import RepGenService
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Preloading models...")
     from .retrieval.config import Config
     from .retrieval.models.hybrid_search import HybridSearchIndex
-    
-    config = Config(repo_path=".", bug_report_path="requirements.txt", output_dir="./repgen_results")
+
+    config = Config(
+        repo_path=".", bug_report_path="requirements.txt", output_dir="./repgen_results"
+    )
     _ = HybridSearchIndex(
         embedding_model=config.EMBEDDING_MODEL,
         reranker_model=config.RERANKER_MODEL,
@@ -25,6 +28,7 @@ async def lifespan(app: FastAPI):
     )
     print("Models preloaded successfully.")
     yield
+
 
 app = FastAPI(title="RepGen API", lifespan=lifespan)
 
