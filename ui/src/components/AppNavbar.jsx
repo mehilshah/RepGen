@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { Activity, FlaskConical } from "lucide-react";
+import { FlaskConical } from "lucide-react";
 
 const NAV_ITEMS = [
     { to: "/", label: "Overview" },
@@ -11,8 +11,12 @@ function AppNavbar() {
     return (
         <header className="app-nav-wrap">
             <div className="app-nav">
-                <NavLink to="/" aria-label="RepGen Home">
-                    <span className="brand-mark">RepGen</span>
+                <NavLink to="/" aria-label="RepGen Home" className="brand-home">
+                    <span className="brand-dot" />
+                    <span className="brand-stack">
+                        <span className="brand-mark">RepGen</span>
+                        <span className="brand-tagline">DL Bug Reproduction</span>
+                    </span>
                 </NavLink>
 
                 <nav className="nav-tabs" aria-label="Primary">
