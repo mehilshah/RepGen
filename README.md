@@ -113,23 +113,9 @@ If you encounter any issues, please open a GitHub issue or contact Mehil Shah at
 
 MIT © [Mehil Shah](https://github.com/mehilshah)
 
+## Future Plans
+* **Source-Level Bug Localization via Code Comprehension**
+  Extend RepGen beyond reproduction to *pinpoint the likely source of the bug* within the repository. By combining retrieval, static analysis, and LLM-driven code comprehension, RepGen will identify suspicious functions, classes, or execution paths that are semantically aligned with the failure trace and bug report. This will reduce manual triage effort and accelerate root-cause analysis.
 
-## Future Work and Research Directions
-
-1. **Scalable Execution via Cluster Schedulers**
-   Integrate RepGen with workload managers such as **SLURM** to offload reproduction tasks to HPC or GPU clusters. This would enable asynchronous execution, queue-based scheduling, and automated user notifications once reproduction artifacts are ready.
-
-2. **Automated Verification in Isolated Sandboxes**
-   Extend RepGen with sandboxed execution environments that automatically validate whether a generated reproduction script successfully triggers the reported bug. This would close the loop between generation and confirmation.
-
-3. **Bug-Type–Aware Verification Strategies**
-   Develop specialized verification mechanisms tailored to different bug classes (e.g., crashes, numerical instability, performance regressions, nondeterministic failures). Each class may require distinct success criteria and instrumentation.
-
-4. **Fine-Grained Bug Localization and Understanding**
-   Move beyond reproduction toward **bug comprehension**, including identifying the most likely fault-inducing components, APIs, or configuration parameters involved in the failure.
-
-5. **Understanding Practitioner Adoption Barriers**
-   Read papers about why practitioners underutilize automated debugging tools, and insights from these papers can guide usability improvements and feature prioritization.
-
-6. **CI/CD and GitHub Actions Integration**
-   Integrate RepGen directly into **GitHub Actions** and other CI pipelines, enabling automated bug reproduction as part of issue triage, regression testing, or pull request validation workflows.
+* **Failure-Aware Context Modeling with Execution Trace Alignment**
+  Incorporate execution signals (e.g., stack traces, assertion failures, tensor shape mismatches, runtime warnings) into the reasoning loop. RepGen will align runtime evidence with repository structure to rank candidate fault locations and highlight minimal code regions responsible for the observed behavior.
