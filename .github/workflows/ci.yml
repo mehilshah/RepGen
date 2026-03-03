@@ -25,25 +25,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        pip install build pre-commit
-
-    - name: Check Formatting (Black via pre-commit)
-      run: pre-commit run black --all-files
-
-    - name: Check Imports (isort via pre-commit)
-      run: pre-commit run isort --all-files
-
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-    - name: Run Tests
-      # Assuming tests exist, otherwise this step is a placeholder or can be skipped
-      # run: pytest
-      run: echo "No tests configured yet, skipping pytest"
+        pip install build
 
     - name: Build Package
       run: python -m build

@@ -7,11 +7,8 @@ function OverviewPage() {
         <main className="hero-shell">
             <header className="hero-header">
                 <div className="brand-row">
-                    <BookOpen className="brand-icon" />
                     <div>
-                        <h1 className="font-serif text-4xl text-slate-900">RepGen</h1>
-                        <p className="brand-subtitle">Imitation Game: reproducing deep learning bugs with an intelligent agent</p>
-                    </div>
+                        <h1 className="font-serif text-4xl text-slate-900">RepGen</h1>                    </div>
                 </div>
             </header>
 
@@ -22,7 +19,7 @@ function OverviewPage() {
                     and iterative code generation with validation loops.
                 </p>
                 <p className="cta-copy">
-                    Paper: <a className="paper-link" href="https://arxiv.org/html/2512.14990v3" target="_blank" rel="noreferrer">arXiv 2512.14990v3</a>
+                    Paper can be found <a className="paper-link" href="https://arxiv.org/pdf/2512.14990" target="_blank" rel="noreferrer">here</a>
                 </p>
                 <Link to="/project" className="btn btn-secondary mt-6">
                     Explore Project Details

@@ -92,22 +92,12 @@ function TryItPage() {
 
     return (
         <main className="content-shell">
-            <div className="topbar">
-                <div className="brand-row">
-                    <Activity className="brand-icon" />
-                    <div>
-                        <h1 className="brand-title">Try-It Workspace</h1>
-                        <p className="brand-subtitle">Configure a bug report, run reproduction, and inspect artifacts</p>
-                    </div>
-                </div>
-            </div>
 
-            <section className="panel p-5 md:p-6">
+            <section className="panel p-5 md:p-6 mt-4">
                 <div className="form-grid">
                     <div className="field">
-                        <label className="field-label">Bug report URL or local path</label>
+                        <label className="field-label">Bug Report URL</label>
                         <div className="input-shell">
-                            <span className="input-icon"><Terminal size={18} /></span>
                             <input
                                 value={bugReport}
                                 onChange={(e) => setBugReport(e.target.value)}
@@ -118,9 +108,8 @@ function TryItPage() {
                     </div>
 
                     <div className="field">
-                        <label className="field-label">Repository URL or local path</label>
+                        <label className="field-label">Repository URL</label>
                         <div className="input-shell">
-                            <span className="input-icon"><GitBranch size={18} /></span>
                             <input
                                 value={repoUrl}
                                 onChange={(e) => setRepoUrl(e.target.value)}
@@ -155,7 +144,7 @@ function TryItPage() {
                     </div>
 
                     <div className="field field-wide">
-                        <label className="field-label">API key (optional if env vars are set)</label>
+                        <label className="field-label">API Key (optional)</label>
                         <div className="input-shell">
                             <input
                                 type="password"
@@ -196,9 +185,6 @@ function TryItPage() {
                 <div className="p-6">
                     <div className="mb-4 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <h2 className="text-xl font-semibold text-slate-900">
-                                {tabs.find((t) => t.id === activeTab)?.label}
-                            </h2>
                             {status === "failed" && error && <span className="error-text">({error})</span>}
                         </div>
                         <span className={`status-pill ${statusClass}`}>{status}</span>
