@@ -4,8 +4,7 @@ import { Activity, FlaskConical } from "lucide-react";
 
 const NAV_ITEMS = [
     { to: "/", label: "Overview" },
-    { to: "/project", label: "Project" },
-    { to: "/try-it", label: "Try-It" },
+    { to: "/project", label: "Project" }
 ];
 
 function AppNavbar() {
