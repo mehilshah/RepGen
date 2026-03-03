@@ -33,6 +33,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="RepGen API", lifespan=lifespan)
 
+DEFAULT_CONNECT_SRC = ["'self'", "https://api.github.com", "https://github.com"]
+EXTRA_CONNECT_SRC = os.getenv("REPGEN_CSP_CONNECT_SRC_EXTRA", "").split(",")
+CONNECT_SRC = " ".join(
+    [*DEFAULT_CONNECT_SRC, *[src.strip() for src in EXTRA_CONNECT_SRC if src.strip()]]
+)
+
 CSP_POLICY = "; ".join(
     [
         "default-src 'self'",
@@ -42,7 +48,7 @@ CSP_POLICY = "; ".join(
         "img-src 'self' data:",
         "script-src 'self'",
         "style-src 'self'",
-        "connect-src 'self'",
+        f"connect-src {CONNECT_SRC}",
         "font-src 'self' data:",
         "upgrade-insecure-requests",
     ]
