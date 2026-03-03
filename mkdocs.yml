@@ -24,6 +24,7 @@ nav:
   - Installation: installation.md
   - Usage: usage.md
   - API Reference: api.md
+  - Security Hardening: security-hardening.md
 
 markdown_extensions:
   - pymdownx.highlight:

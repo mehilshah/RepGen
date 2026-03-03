@@ -1,9 +1,10 @@
+import os
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -31,6 +32,43 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="RepGen API", lifespan=lifespan)
+
+CSP_POLICY = "; ".join(
+    [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "img-src 'self' data:",
+        "script-src 'self'",
+        "style-src 'self'",
+        "connect-src 'self'",
+        "font-src 'self' data:",
+        "upgrade-insecure-requests",
+    ]
+)
+CSP_ENFORCE = os.getenv("REPGEN_CSP_ENFORCE", "").lower() in {"1", "true", "yes"}
+SECURITY_HEADERS = {
+    # Keep this conservative because the deployment may not own all subdomains.
+    "Strict-Transport-Security": "max-age=31536000",
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
+}
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for header, value in SECURITY_HEADERS.items():
+        response.headers[header] = value
+
+    csp_header = (
+        "Content-Security-Policy" if CSP_ENFORCE else "Content-Security-Policy-Report-Only"
+    )
+    response.headers[csp_header] = CSP_POLICY
+    return response
 
 # Configure CORS
 app.add_middleware(
