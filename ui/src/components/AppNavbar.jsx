@@ -12,8 +12,7 @@ function AppNavbar() {
     return (
         <header className="app-nav-wrap">
             <div className="app-nav">
-                <NavLink to="/" className="brand-pill" aria-label="RepGen Home">
-                    <Activity size={18} />
+                <NavLink to="/" aria-label="RepGen Home">
                     <span className="brand-mark">RepGen</span>
                 </NavLink>
 
