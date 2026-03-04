@@ -1,4 +1,5 @@
 import ast
+import hashlib
 import json
 import logging
 import os
@@ -102,40 +103,86 @@ def fetch_content(source: str) -> tuple[str, Optional[str]]:
 
 def prepare_repository(
     source: str, temp_dir: Optional[str] = None
-) -> str:  # Use a temporary directory outside the project if not provided
+) -> str:
+    """
+    Prepare the repository. If remote URL, clone via a local mirror cache.
+    If local, validate it.
+    Returns the absolute path to the local repository.
+    """
     if temp_dir is None:
         import tempfile
 
         temp_dir = tempfile.mkdtemp(prefix="repgen_")
-    """
-    Prepare the repository. If remote URL, clones it. If local, validates it.
-    Returns the absolute path to the local repository.
-    """
+
     if (
         source.startswith("http://")
         or source.startswith("https://")
         or source.startswith("git@")
     ):
-        # It's a remote repo
+        # It's a remote repo.
         repo_name = source.rstrip("/").split("/")[-1].replace(".git", "")
         local_path = Path(temp_dir) / repo_name
-
         if local_path.exists():
             console.log(
                 f"[warning]Directory {local_path} exists. Using existing content.[/warning]"
             )
-            # Optional: Pull latest? For safety, we just use it or fail if user wants fresh.
-        else:
-            console.log(f"[info]Cloning {source} to {local_path}...[/info]")
-            try:
+            return str(local_path.resolve())
+
+        cache_root = Path(
+            os.getenv("REPGEN_REPO_CACHE_DIR", "~/.cache/repgen/repos")
+        ).expanduser()
+        cache_root.mkdir(parents=True, exist_ok=True)
+
+        source_key = hashlib.sha1(source.strip().encode("utf-8")).hexdigest()[:12]
+        mirror_path = cache_root / f"{repo_name}-{source_key}.git"
+
+        try:
+            if mirror_path.exists():
+                console.log(
+                    f"[info]Updating cached mirror for {source} at {mirror_path}...[/info]"
+                )
+                # Best effort update; stale cache is still useful if network is unavailable.
                 subprocess.run(
-                    ["git", "clone", source, str(local_path)],
+                    ["git", "remote", "update", "--prune"],
+                    cwd=mirror_path,
                     check=True,
                     capture_output=True,
+                    text=True,
                 )
-                console.log("[success]Cloned successfully.[/success]")
-            except subprocess.CalledProcessError as e:
-                raise RuntimeError(f"Failed to clone repository: {e}")
+            else:
+                console.log(
+                    f"[info]Creating cached mirror for {source} at {mirror_path}...[/info]"
+                )
+                subprocess.run(
+                    ["git", "clone", "--mirror", source, str(mirror_path)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+        except subprocess.CalledProcessError as e:
+            console.log(
+                f"[warning]Cache update failed, using existing cache if available: {e.stderr.strip() if e.stderr else e}[/warning]"
+            )
+            if not mirror_path.exists():
+                raise RuntimeError(
+                    f"Failed to build repository cache and no cache exists: {e.stderr.strip() if e.stderr else e}"
+                )
+
+        console.log(
+            f"[info]Creating working copy from cache: {mirror_path} -> {local_path}...[/info]"
+        )
+        try:
+            subprocess.run(
+                ["git", "clone", str(mirror_path), str(local_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            console.log("[success]Repository prepared from cache.[/success]")
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(
+                f"Failed to clone repository from cache: {e.stderr.strip() if e.stderr else e}"
+            )
 
         return str(local_path.resolve())
     else:
