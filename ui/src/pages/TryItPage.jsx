@@ -232,9 +232,37 @@ function parseContextArtifact(rawContext) {
         const mainFileLines = typeof mainContent === "string" ? mainContent.split("\n").length : 0;
         const snippets = Array.isArray(parsed.module_snippets) ? parsed.module_snippets : [];
         const dependencies = Array.isArray(parsed.dependencies) ? parsed.dependencies : [];
+        const canonicalSnippetLineKey = (snippet) => {
+            const start = Number(snippet?.start_line || 0);
+            const end = Number(snippet?.end_line || 0);
+            if (start > 0 && end > 0) {
+                const s = Math.min(start, end);
+                const e = Math.max(start, end);
+                return `${s}-${e}`;
+            }
+            const rawLines = String(snippet?.lines || "").trim().toLowerCase();
+            if (!rawLines) return "n/a";
+            // Normalize variants like "10 - 20", "L10-L20", "10–20" to the same key.
+            const cleaned = rawLines
+                .replace(/[–—]/g, "-")
+                .replace(/\s+/g, "")
+                .replace(/[^0-9,\-]/g, "");
+            return cleaned || "n/a";
+        };
+
+        const dedupeSnippetsByLines = (entrySnippets) => {
+            const seen = new Set();
+            return entrySnippets.filter((snippet) => {
+                const linesKey = canonicalSnippetLineKey(snippet);
+                if (seen.has(linesKey)) return false;
+                seen.add(linesKey);
+                return true;
+            });
+        };
+
         const totalSnippetBlocks = snippets.reduce((count, entry) => {
-            const entrySnippets = Array.isArray(entry?.snippets) ? entry.snippets.length : 0;
-            return count + entrySnippets;
+            const entrySnippets = Array.isArray(entry?.snippets) ? dedupeSnippetsByLines(entry.snippets) : [];
+            return count + entrySnippets.length;
         }, 0);
         const score = typeof parsed.score === "number" ? parsed.score : null;
 
@@ -268,18 +296,19 @@ function parseContextArtifact(rawContext) {
             reason,
             metrics,
             data: parsed,
-            supportingFiles: snippets.map((entry) => ({
-                file: entry.file,
-                shortFile: basenamePath(entry.file),
-                snippetCount: Array.isArray(entry.snippets) ? entry.snippets.length : 0,
-                snippets: Array.isArray(entry.snippets)
-                    ? entry.snippets.map((snippet, idx) => ({
+            supportingFiles: snippets.map((entry) => {
+                const uniqueSnippets = Array.isArray(entry.snippets) ? dedupeSnippetsByLines(entry.snippets) : [];
+                return {
+                    file: entry.file,
+                    shortFile: basenamePath(entry.file),
+                    snippetCount: uniqueSnippets.length,
+                    snippets: uniqueSnippets.map((snippet, idx) => ({
                         id: `${entry.file}-${idx}`,
                         lines: snippet?.lines || "N/A",
                         code: previewText(snippet?.code || "", 18),
-                    }))
-                    : [],
-            })),
+                    })),
+                };
+            }),
             raw: rawContext,
             mainContentPreview: previewText(mainContent, 100),
         };
@@ -593,17 +622,33 @@ function GeneratedCodePanel({ code, annotations, explanationLoading, explanation
         (annotations || []).find((ann) => lineNumber >= ann.start_line && lineNumber <= ann.end_line) || null
     );
 
+    const formatAnnotationLabel = (label) => (
+        String(label || "")
+            .trim()
+            .replace(/[_-]+/g, " ")
+            .toLowerCase()
+            .split(/\s+/)
+            .filter(Boolean)
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ")
+    );
+
     const labelClass = (label) => {
+        const level = likelihoodLevel(label);
+        return `code-anno-likelihood-${level}`;
+    };
+
+    const likelihoodLevel = (label) => {
         const normalized = String(label || "").toLowerCase();
-        if (normalized.includes("data")) return "code-anno-data";
-        if (normalized.includes("weight")) return "code-anno-weight";
-        if (normalized.includes("model")) return "code-anno-model";
-        if (normalized.includes("train")) return "code-anno-train";
-        if (normalized.includes("eval")) return "code-anno-eval";
-        if (normalized.includes("trigger") || normalized.includes("bug")) return "code-anno-trigger";
-        if (normalized.includes("valid")) return "code-anno-validate";
-        if (normalized.includes("error")) return "code-anno-error";
-        return "code-anno-generic";
+        if (normalized.includes("trigger") || normalized.includes("bug")) return 3;
+        if (normalized.includes("error")) return 3;
+        if (normalized.includes("train")) return 2;
+        if (normalized.includes("model")) return 2;
+        if (normalized.includes("weight")) return 2;
+        if (normalized.includes("valid")) return 1;
+        if (normalized.includes("eval")) return 1;
+        if (normalized.includes("data")) return 1;
+        return 2;
     };
 
     const isTriggerLabel = (label) => {
@@ -617,6 +662,13 @@ function GeneratedCodePanel({ code, annotations, explanationLoading, explanation
             || normalized.includes("nan")
             || normalized.includes("symptom")
         );
+    };
+
+    const sidePopupText = (label) => {
+        const level = likelihoodLevel(label);
+        if (level === 3) return "Highly Likely To Have The Bug";
+        if (level === 2) return "Moderately Likely To Have The Bug";
+        return "Less Likely To Have A Bug";
     };
 
     const copyCode = async () => {
@@ -634,13 +686,15 @@ function GeneratedCodePanel({ code, annotations, explanationLoading, explanation
             <div className="artifact-shell">
                 <div className="artifact-header">
                     <h3>Generated reproduction code</h3>
-                    <div className="flex items-center gap-2">
-                        <span className="artifact-meta">Coverage: {coverage.percent}%</span>
-                        <span className="artifact-meta">{countLines(code)} lines</span>
-                        <button type="button" className="btn btn-secondary text-xs" onClick={copyCode}>
-                            <Clipboard size={14} />
-                            {copied ? "Copied" : "Copy"}
-                        </button>
+                    <div className="code-header-meta">
+                        <div className="code-header-stats">
+                            <span className="artifact-meta">Explanation Coverage: {coverage.percent}%</span>
+                            <span className="artifact-meta">{countLines(code)} lines</span>
+                            <button type="button" className="btn btn-secondary text-xs" onClick={copyCode}>
+                                <Clipboard size={14} />
+                                {copied ? "Copied" : "Copy"}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -657,8 +711,9 @@ function GeneratedCodePanel({ code, annotations, explanationLoading, explanation
                     )}
                     {explanationLoading && <p>Generating line-level explanations...</p>}
                     {!explanationLoading && hoveredAnnotation && (
-                        <p>
-                            <strong>{hoveredAnnotation.label}</strong> (Lines {hoveredAnnotation.start_line}-{hoveredAnnotation.end_line}):{" "}
+                        <p className="code-explain-copy">
+                            <strong>{formatAnnotationLabel(hoveredAnnotation.label)}</strong>{" "}
+                            (Lines {hoveredAnnotation.start_line}-{hoveredAnnotation.end_line}):{" "}
                             {hoveredAnnotation.explanation}
                         </p>
                     )}
@@ -685,6 +740,20 @@ function GeneratedCodePanel({ code, annotations, explanationLoading, explanation
                             >
                                 <span className="code-line-no">{lineNo}</span>
                                 <code className="code-line-text">{line || " "}</code>
+                                {!explanationLoading
+                                    && !explanationError
+                                    && hoveredAnnotation
+                                    && annotation
+                                    && lineNo === hoveredAnnotation.start_line
+                                    && (
+                                        <div
+                                            className={`code-risk-float code-risk-float-level-${likelihoodLevel(hoveredAnnotation.label)}`}
+                                        >
+                                            <div className="code-risk-float-title">
+                                                {sidePopupText(hoveredAnnotation.label)}
+                                            </div>
+                                        </div>
+                                    )}
                             </div>
                         );
                     })}
