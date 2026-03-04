@@ -6,6 +6,7 @@ import {
     Clipboard,
     FileCode,
     FileText,
+    Info,
     ListChecks,
     Loader,
     Play,
@@ -72,14 +73,6 @@ function parseStageLog(logLine) {
     return { stage: (m[1] || "info").toLowerCase(), message: m[2] || "" };
 }
 
-function toCapitalizedDisplay(text) {
-    if (!text || typeof text !== "string") return "";
-    return text
-        .split("\n")
-        .map((line) => line.replace(/\b([a-z])([a-z]*)/g, (_, first, rest) => `${first.toUpperCase()}${rest}`))
-        .join("\n");
-}
-
 function humanizeLogMessage(message) {
     if (!message) return "(No details)";
     let output = message.replace(/\s+/g, " ").trim();
@@ -90,6 +83,16 @@ function humanizeLogMessage(message) {
         .replace(/^Bug Report Refined/i, "Refined bug report")
         .replace(/^Reproduction Successful/i, "Successfully generated a reproduction script");
     return output.charAt(0).toUpperCase() + output.slice(1);
+}
+
+function formatSectionHeading(heading) {
+    if (!heading) return "";
+    return heading
+        .toLowerCase()
+        .split(" ")
+        .filter(Boolean)
+        .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+        .join(" ");
 }
 
 function stageLabel(stage) {
@@ -433,17 +436,19 @@ function LogsPanel({ logs, artifacts, bugReport, model, backend }) {
                 <div className="artifact-header">
                     <h3>Execution timeline</h3>
                 </div>
-                <div className="log-list">
+                <ol className="timeline-list">
                     {parsedLogs.map((entry, i) => (
-                        <div key={`${entry.stage}-${i}`} className="log-item">
-                            <span className={`log-stage log-stage-${entry.stage}`}>{entry.stage}</span>
-                            <div className="log-detail">
-                                <div className="log-step-id">Step {i + 1}</div>
-                                <span className="log-message">{humanizeLogMessage(entry.message)}</span>
+                        <li key={`${entry.stage}-${i}`} className="timeline-item">
+                            <div className="timeline-index">{i + 1}</div>
+                            <div className="timeline-content">
+                                <div className="timeline-head">
+                                    <span className={`log-stage log-stage-${entry.stage}`}>{stageLabel(entry.stage)}</span>
+                                </div>
+                                <p className="timeline-message">{humanizeLogMessage(entry.message)}</p>
                             </div>
-                        </div>
+                        </li>
                     ))}
-                </div>
+                </ol>
             </div>
         </div>
     );
@@ -472,8 +477,8 @@ function RefinedReportPanel({ report }) {
                     <div className="artifact-sections mt-3">
                         {sections.map((section, idx) => (
                             <article key={`${section.heading}-${idx}`} className="artifact-section-card">
-                                <div className="artifact-section-title">{section.heading}</div>
-                                <div className="report-text-block mt-2">{toCapitalizedDisplay(section.content)}</div>
+                                <div className="artifact-section-title report-heading">{formatSectionHeading(section.heading)}</div>
+                                <div className="report-text-block mt-2">{section.content}</div>
                             </article>
                         ))}
                     </div>
@@ -509,8 +514,9 @@ function PlanPanel({ plan }) {
                     <summary>Step preview</summary>
                     <div className="artifact-sections mt-3">
                         {parsed.steps.map((step) => (
-                            <article key={`plan-step-${step.idx}`} className="artifact-section-card">
-                                <div className="artifact-section-title">Step {step.idx}: {step.title}</div>
+                            <article key={`plan-step-${step.idx}`} className="artifact-section-card plan-step-card">
+                                <div className="plan-step-title">Step {step.idx}</div>
+                                <p className="plan-step-copy">{step.title}</p>
                                 {step.description && <p>{step.description}</p>}
                                 {step.command && (
                                     <div className="mt-2">
@@ -537,8 +543,81 @@ function PlanPanel({ plan }) {
     );
 }
 
-function GeneratedCodePanel({ code }) {
+function GeneratedCodePanel({ code, annotations, explanationLoading, explanationError }) {
     const [copied, setCopied] = useState(false);
+    const [hoveredAnnotation, setHoveredAnnotation] = useState(null);
+    const lines = useMemo(() => code.split("\n"), [code]);
+    const coverage = useMemo(() => {
+        const nonEmpty = lines
+            .map((line, idx) => ({ line, no: idx + 1 }))
+            .filter((item) => item.line.trim())
+            .map((item) => item.no);
+        if (nonEmpty.length === 0) {
+            return { percent: 100, uncoveredRanges: [] };
+        }
+
+        const covered = new Set();
+        (annotations || []).forEach((ann) => {
+            const start = Number(ann?.start_line || 0);
+            const end = Number(ann?.end_line || 0);
+            if (!start || !end) return;
+            const s = Math.min(start, end);
+            const e = Math.max(start, end);
+            for (let n = s; n <= e; n += 1) covered.add(n);
+        });
+
+        const uncovered = nonEmpty.filter((n) => !covered.has(n));
+        const percent = Math.round(((nonEmpty.length - uncovered.length) / nonEmpty.length) * 100);
+
+        const ranges = [];
+        if (uncovered.length > 0) {
+            let start = uncovered[0];
+            let prev = uncovered[0];
+            for (let i = 1; i < uncovered.length; i += 1) {
+                const current = uncovered[i];
+                if (current === prev + 1) {
+                    prev = current;
+                    continue;
+                }
+                ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+                start = current;
+                prev = current;
+            }
+            ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+        }
+
+        return { percent, uncoveredRanges: ranges };
+    }, [lines, annotations]);
+
+    const findAnnotationForLine = (lineNumber) => (
+        (annotations || []).find((ann) => lineNumber >= ann.start_line && lineNumber <= ann.end_line) || null
+    );
+
+    const labelClass = (label) => {
+        const normalized = String(label || "").toLowerCase();
+        if (normalized.includes("data")) return "code-anno-data";
+        if (normalized.includes("weight")) return "code-anno-weight";
+        if (normalized.includes("model")) return "code-anno-model";
+        if (normalized.includes("train")) return "code-anno-train";
+        if (normalized.includes("eval")) return "code-anno-eval";
+        if (normalized.includes("trigger") || normalized.includes("bug")) return "code-anno-trigger";
+        if (normalized.includes("valid")) return "code-anno-validate";
+        if (normalized.includes("error")) return "code-anno-error";
+        return "code-anno-generic";
+    };
+
+    const isTriggerLabel = (label) => {
+        const normalized = String(label || "").toLowerCase();
+        return (
+            normalized.includes("trigger")
+            || normalized.includes("bug")
+            || normalized.includes("failure")
+            || normalized.includes("crash")
+            || normalized.includes("exception")
+            || normalized.includes("nan")
+            || normalized.includes("symptom")
+        );
+    };
 
     const copyCode = async () => {
         try {
@@ -556,6 +635,7 @@ function GeneratedCodePanel({ code }) {
                 <div className="artifact-header">
                     <h3>Generated reproduction code</h3>
                     <div className="flex items-center gap-2">
+                        <span className="artifact-meta">Coverage: {coverage.percent}%</span>
                         <span className="artifact-meta">{countLines(code)} lines</span>
                         <button type="button" className="btn btn-secondary text-xs" onClick={copyCode}>
                             <Clipboard size={14} />
@@ -564,12 +644,57 @@ function GeneratedCodePanel({ code }) {
                     </div>
                 </div>
             </div>
-            <pre className="block-pre code-block">{code}</pre>
+            <div className="code-explain-wrap">
+                <div className="code-explain-panel">
+                    <div className="code-explain-title">
+                        <Info size={14} />
+                        Segment explanation
+                    </div>
+                    {!explanationLoading && coverage.uncoveredRanges.length > 0 && !explanationError && (
+                        <p>
+                            Uncovered lines: {coverage.uncoveredRanges.join(", ")}
+                        </p>
+                    )}
+                    {explanationLoading && <p>Generating line-level explanations...</p>}
+                    {!explanationLoading && hoveredAnnotation && (
+                        <p>
+                            <strong>{hoveredAnnotation.label}</strong> (Lines {hoveredAnnotation.start_line}-{hoveredAnnotation.end_line}):{" "}
+                            {hoveredAnnotation.explanation}
+                        </p>
+                    )}
+                    {!explanationLoading && !hoveredAnnotation && !explanationError && (
+                        <p>Hover over an annotated line block to view the explanation generated with the context.</p>
+                    )}
+                    {explanationError && <p>{explanationError}</p>}
+                </div>
+                <div className="block-pre code-block">
+                    {lines.map((line, idx) => {
+                        const lineNo = idx + 1;
+                        const annotation = findAnnotationForLine(lineNo);
+                        const activeRange = hoveredAnnotation
+                            && lineNo >= hoveredAnnotation.start_line
+                            && lineNo <= hoveredAnnotation.end_line;
+                        const triggerPersistent = annotation && isTriggerLabel(annotation.label);
+                        return (
+                            <div
+                                key={`line-${lineNo}`}
+                                className={`code-line ${annotation ? `code-line-annotated ${labelClass(annotation.label)}` : ""
+                                    } ${activeRange ? "code-line-active-range" : ""} ${triggerPersistent ? "code-line-trigger-persistent" : ""
+                                    }`}
+                                onMouseEnter={() => setHoveredAnnotation(annotation)}
+                            >
+                                <span className="code-line-no">{lineNo}</span>
+                                <code className="code-line-text">{line || " "}</code>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
         </div>
     );
 }
 
-function ContextPanel({ context }) {
+function ContextPanel({ context, aiContextSummary, aiLoading, aiError }) {
     const parsed = useMemo(() => parseContextArtifact(context), [context]);
     const [showRaw, setShowRaw] = useState(false);
 
@@ -624,6 +749,21 @@ function ContextPanel({ context }) {
                         <li>+ {parsed.supportingFiles.length - 5} more supporting files</li>
                     )}
                 </ul>
+                <div className="ai-reason-card mt-3">
+                    <div className="artifact-kv">AI explanation</div>
+                    {aiLoading && <p className="mt-2 text-sm">Generating explanation...</p>}
+                    {!aiLoading && Array.isArray(aiContextSummary) && aiContextSummary.length > 0 && (
+                        <ul className="context-point-list">
+                            {aiContextSummary.map((point, idx) => (
+                                <li key={`ctx-point-${idx}`}>{point}</li>
+                            ))}
+                        </ul>
+                    )}
+                    {!aiLoading && (!aiContextSummary || aiContextSummary.length === 0) && !aiError && (
+                        <p className="mt-2 text-sm">Context explanation will appear here.</p>
+                    )}
+                    {aiError && <p className="mt-2 text-sm">{aiError}</p>}
+                </div>
             </details>
 
             {parsed.supportingFiles.some((file) => file.snippets.length > 0) && (
@@ -700,7 +840,6 @@ function ContextPanel({ context }) {
 
 function TryItPage() {
     const [bugReport, setBugReport] = useState("");
-    const [repoUrl, setRepoUrl] = useState("");
     const [backend, setBackend] = useState("");
     const [model, setModel] = useState("");
     const [apiKey, setApiKey] = useState("");
@@ -711,6 +850,20 @@ function TryItPage() {
     const [status, setStatus] = useState("idle");
     const [logs, setLogs] = useState([]);
     const [error, setError] = useState(null);
+    const [aiContextInsights, setAiContextInsights] = useState({
+        loading: false,
+        error: "",
+        contextReason: "",
+        contextSummary: [],
+        generatedForTaskId: null,
+    });
+    const [aiCodeInsights, setAiCodeInsights] = useState({
+        loading: false,
+        error: "",
+        codeExplanation: "",
+        codeAnnotations: [],
+        generatedForTaskId: null,
+    });
 
     const tabs = [
         { id: "logs", label: "Logs", icon: <Terminal size={16} /> },
@@ -719,24 +872,39 @@ function TryItPage() {
         { id: "context", label: "Context", icon: <CheckCircle size={16} /> },
         { id: "code", label: "Generated Code", icon: <CheckCircle size={16} /> },
     ];
+    const activeTabMeta = tabs.find((tab) => tab.id === activeTab) || tabs[0];
 
     const startReproduction = async () => {
-        if (!bugReport.trim() || !repoUrl.trim() || !backend || !model.trim()) {
+        if (!bugReport.trim() || !backend || !model.trim()) {
             setStatus("failed");
-            setError("Bug report, repository, backend, and model are required.");
+            setError("Bug report URL, backend, and model are required.");
             return;
         }
 
         try {
             setStatus("running");
+            setTaskId(null);
             setLogs([]);
             setArtifacts({});
             setError(null);
+            setAiContextInsights({
+                loading: false,
+                error: "",
+                contextReason: "",
+                contextSummary: [],
+                generatedForTaskId: null,
+            });
+            setAiCodeInsights({
+                loading: false,
+                error: "",
+                codeExplanation: "",
+                codeAnnotations: [],
+                generatedForTaskId: null,
+            });
             setActiveTab("logs");
 
             const res = await axios.post(`${API_URL}/reproduce`, {
                 bug_report: bugReport.trim(),
-                repo_url: repoUrl.trim(),
                 backend,
                 model: model.trim(),
                 api_key: apiKey.trim() || null,
@@ -746,6 +914,7 @@ function TryItPage() {
         } catch (e) {
             setError(e.response?.data?.detail || e.message);
             setStatus("failed");
+            setTaskId(null);
         }
     };
 
@@ -784,12 +953,98 @@ function TryItPage() {
         failed: "status-failed",
     }[status] || "status-idle";
 
+    const fetchContextInsights = async () => {
+        if (!taskId) return;
+        if (!artifacts.context) return;
+        if (aiContextInsights.generatedForTaskId === taskId) {
+            return;
+        }
+        if (aiContextInsights.loading) return;
+
+        setAiContextInsights((prev) => ({ ...prev, loading: true, error: "" }));
+        try {
+            const response = await axios.post(`${API_URL}/explain/context`, {
+                bug_report: bugReport.trim(),
+                refined_report: artifacts.refined_report || "",
+                context: artifacts.context || "",
+                api_key: apiKey.trim() || null,
+            });
+            setAiContextInsights({
+                loading: false,
+                error: "",
+                contextReason: response.data.context_reason || "",
+                contextSummary: response.data.context_summary || [],
+                generatedForTaskId: taskId,
+            });
+        } catch (explainErr) {
+            setAiContextInsights((prev) => ({
+                ...prev,
+                loading: false,
+                error: explainErr.response?.data?.detail || "Failed to generate context explanation.",
+                generatedForTaskId: taskId,
+            }));
+        }
+    };
+
+    const fetchCodeInsights = async () => {
+        if (!taskId) return;
+        if (!artifacts.code) return;
+        if (aiCodeInsights.generatedForTaskId === taskId) {
+            return;
+        }
+        if (aiCodeInsights.loading) return;
+
+        setAiCodeInsights((prev) => ({ ...prev, loading: true, error: "" }));
+        try {
+            const response = await axios.post(`${API_URL}/explain/code`, {
+                bug_report: bugReport.trim(),
+                refined_report: artifacts.refined_report || "",
+                plan: artifacts.plan || "",
+                code: artifacts.code || "",
+                api_key: apiKey.trim() || null,
+            });
+            setAiCodeInsights({
+                loading: false,
+                error: "",
+                codeExplanation: response.data.code_explanation || "",
+                codeAnnotations: response.data.code_annotations || [],
+                generatedForTaskId: taskId,
+            });
+        } catch (explainErr) {
+            setAiCodeInsights((prev) => ({
+                ...prev,
+                loading: false,
+                error: explainErr.response?.data?.detail || "Failed to generate code explanation.",
+                generatedForTaskId: taskId,
+            }));
+        }
+    };
+
+    useEffect(() => {
+        if (artifacts.context) {
+            fetchContextInsights();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [taskId, artifacts.context]);
+
+    useEffect(() => {
+        if (artifacts.code) {
+            fetchCodeInsights();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [taskId, artifacts.code]);
+
     return (
         <main className="content-shell">
-
             <section className="panel p-5 md:p-6 mt-4">
+                <div className="section-head">
+                    <h2 className="section-title">Run reproduction</h2>
+                    <p className="section-copy">
+                        Paste a GitHub issue URL. Repository is derived automatically from the issue.
+                    </p>
+                </div>
                 <div className="form-grid">
-                    <div className="field">
+                    <div className="field field-wide">
                         <label className="field-label">Bug Report URL</label>
                         <div className="input-shell">
                             <input
@@ -797,18 +1052,6 @@ function TryItPage() {
                                 onChange={(e) => setBugReport(e.target.value)}
                                 className="input-control"
                                 placeholder="https://github.com/owner/repo/issues/123"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="field">
-                        <label className="field-label">Repository URL</label>
-                        <div className="input-shell">
-                            <input
-                                value={repoUrl}
-                                onChange={(e) => setRepoUrl(e.target.value)}
-                                className="input-control"
-                                placeholder="https://github.com/owner/repo"
                             />
                         </div>
                     </div>
@@ -851,14 +1094,19 @@ function TryItPage() {
                     </div>
                 </div>
 
-                <button
-                    onClick={startReproduction}
-                    disabled={status === "running"}
-                    className={`btn btn-primary btn-wide mt-5 ${status === "running" ? "btn-disabled" : ""}`}
-                >
-                    {status === "running" ? <Loader className="animate-spin" /> : <Play />}
-                    <span>{status === "running" ? "Reproducing..." : "Start Reproduction"}</span>
-                </button>
+                <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="text-sm text-slate-600">
+                        Using model <strong>{model || "N/A"}</strong> on <strong>{backend || "N/A"}</strong>
+                    </div>
+                    <button
+                        onClick={startReproduction}
+                        disabled={status === "running"}
+                        className={`btn btn-primary md:min-w-[240px] ${status === "running" ? "btn-disabled" : ""}`}
+                    >
+                        {status === "running" ? <Loader className="animate-spin" /> : <Play />}
+                        <span>{status === "running" ? "Reproducing..." : "Start Reproduction"}</span>
+                    </button>
+                </div>
             </section>
 
             <section className="workspace-card">
@@ -877,11 +1125,15 @@ function TryItPage() {
                 </div>
 
                 <div className="p-6">
-                    <div className="mb-4 flex items-center justify-between">
+                    <div className="workspace-head">
+                        <div>
+                            <div className="workspace-title">{activeTabMeta.label}</div>
+                            <div className="workspace-copy">Live output and generated artifacts for the current run.</div>
+                        </div>
                         <div className="flex items-center gap-2">
                             {status === "failed" && error && <span className="error-text">({error})</span>}
+                            <span className={`status-pill ${statusClass}`}>{status}</span>
                         </div>
-                        <span className={`status-pill ${statusClass}`}>{status}</span>
                     </div>
 
                     {activeTab === "logs" && (
@@ -897,13 +1149,25 @@ function TryItPage() {
                     )}
 
                     {activeTab === "context" && (
-                        artifacts.context ? <ContextPanel context={artifacts.context} /> : <div className="placeholder-block">Waiting for context retrieval...</div>
+                        artifacts.context ? (
+                            <ContextPanel
+                                context={artifacts.context}
+                                aiContextSummary={aiContextInsights.contextSummary}
+                                aiLoading={aiContextInsights.loading}
+                                aiError={aiContextInsights.error}
+                            />
+                        ) : <div className="placeholder-block">Waiting for context retrieval...</div>
                     )}
 
                     {activeTab === "code" && (
                         <div className="space-y-4">
                             {artifacts.code ? (
-                                <GeneratedCodePanel code={artifacts.code} />
+                                <GeneratedCodePanel
+                                    code={artifacts.code}
+                                    annotations={aiCodeInsights.codeAnnotations}
+                                    explanationLoading={aiCodeInsights.loading}
+                                    explanationError={aiCodeInsights.error}
+                                />
                             ) : (
                                 <div className="placeholder-block">Waiting for code generation...</div>
                             )}
