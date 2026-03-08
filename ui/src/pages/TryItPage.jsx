@@ -721,6 +721,13 @@ function GeneratedCodePanel({ code, annotations, explanationLoading, explanation
                         <p>Hover over an annotated line block to view the explanation generated with the context.</p>
                     )}
                     {explanationError && <p>{explanationError}</p>}
+
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm text-blue-800 m-0">
+                            <strong>Notice an issue?</strong> We'd love to hear your feedback.
+                            <a href="mailto:shahmehil@dal.ca" className="text-blue-600 hover:text-blue-800 hover:underline font-medium ml-1">Send an email</a>.
+                        </p>
+                    </div>
                 </div>
                 <div className="block-pre code-block">
                     {lines.map((line, idx) => {
