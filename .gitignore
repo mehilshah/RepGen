@@ -4,6 +4,9 @@ temp_repos
 venv
 .DS_Store
 .env
+.env.*
+.envrc
+.python-version
 node_modules
 .vscode-test
 site
@@ -13,3 +16,12 @@ build/
 .pytest_cache
 *.spec
 *.log
+logs/
+*.pem
+*.key
+*.p12
+*.jks
+*.crt
+*.cer
+.ssh/
+.kube/
