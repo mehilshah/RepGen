@@ -14,6 +14,9 @@ server {
     add_header Permissions-Policy "geolocation=(), camera=(), microphone=()" always;
     add_header Content-Security-Policy-Report-Only "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self' https://api.github.com https://github.com; font-src 'self' data:; upgrade-insecure-requests;" always;
 
+    # Bug reports / repo payloads can exceed nginx's 1 MB default and 413.
+    client_max_body_size 25m;
+
     # Proxy requests for the Vite UI (React app) under /~repgen/
     location /~repgen/ {
         proxy_pass http://127.0.0.1:5173/~repgen/;
@@ -33,5 +36,25 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        # LLM-backed endpoints (reproduce, explain) can run well past nginx's
+        # 60s default, especially when an LLM server shares this host's GPU.
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+    }
+
+    # Proxy requests for the local LLM server (e.g. vLLM) under /~vllm/
+    location /~vllm/ {
+        proxy_pass http://127.0.0.1:8080/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Token streaming should flush as it arrives, not be buffered.
+        proxy_buffering off;
+        proxy_read_timeout 600s;
     }
 }
