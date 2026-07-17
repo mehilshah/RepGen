@@ -1,46 +1,84 @@
 # Usage
 
-## Interactive CLI
-The easiest way to start.
-```bash
-repgen
-```
-Follow the wizard to select your LLM backend, model, and input URLs.
+RepGen is a subcommand-based CLI.
 
-## Command Line Automation
-For power users and scripts.
 ```bash
-repgen \
+repgen run            # explore → generate → verify a reproduction
+repgen backends       # list backends and which are configured
+repgen config ...     # manage persistent defaults
+repgen version
+```
+
+## Running a reproduction
+
+Interactive — RepGen prompts for anything you omit:
+
+```bash
+repgen run
+```
+
+Non-interactive:
+
+```bash
+repgen run \
   --bug-report https://github.com/owner/repo/issues/123 \
-  --repo-path https://github.com/owner/repo.git \
-  --backend openai \
-  --model gpt-4o
+  --repo https://github.com/owner/repo.git \
+  --backend ollama --model llama3.1 \
+  --yes
 ```
 
-## Web UI
-1. Start the API: `uvicorn repgen.server:app --reload`
-2. Start the UI: `cd ui && npm run dev`
-3. Open `http://localhost:5173`
+### `run` options
 
-## Configuration
+| Flag | Description |
+| --- | --- |
+| `-b, --bug-report` | Path or URL to a bug report / GitHub issue |
+| `-r, --repo` | Path or URL to the repository |
+| `--backend` | `openai` · `claude` · `gemini` · `openrouter` · `ollama` |
+| `--model` | Model name (defaults per backend) |
+| `--commit` | Check out a specific commit before analysis |
+| `-o, --output` | Output directory (default `./repgen_results`) |
+| `--max-attempts` | Generation attempts per run (default 3) |
+| `--max-explore-steps` | Exploration budget (default 12) |
+| `-v, --verbose` | Stream every tool call and finding |
+| `-y, --yes` | Non-interactive; fail if inputs are missing |
 
-You can provide API keys via environment variables or the interactive CLI/UI.
+## Backends & keys
 
 ```bash
 export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
 export GEMINI_API_KEY="AIza..."
-export ANTHROPIC_API_KEY="sk-ant..."
+export OPENROUTER_API_KEY="sk-or-..."
+# Ollama is keyless; set OLLAMA_HOST to point at a remote server.
 ```
 
-## Output Structure
+`repgen backends` shows each provider, its default model, and whether it is
+configured.
 
-Results are saved to `repgen_results/` by default.
+## Configuration file
 
-```plaintext
+Persistent defaults live in `~/.config/repgen/config.toml` (override the location
+with `$REPGEN_CONFIG`).
+
+```bash
+repgen config init                    # write defaults
+repgen config show                    # view effective config
+repgen config set backend claude      # change a value
+repgen config path                    # print the file path
+```
+
+Resolution order: **CLI flags → config file → built-in defaults**.
+
+## Output
+
+Each run writes a timestamped directory under the output folder:
+
+```text
 repgen_results/
-└── <project_id>/
-    ├── reproduction_script.py  # The generated script
-    ├── plan.json               # Step-by-step plan
-    ├── refined_bug_report.txt  # Analysis
-    └── context/                # Code snippets used
+└── RepGen_Run_<timestamp>/
+    ├── input_bug_report.txt   # fetched bug report
+    ├── refined_report.txt     # structured analysis
+    ├── reproduce.py           # generated reproduction script
+    ├── report.md              # human-readable run report
+    └── report.json            # machine-readable run report
 ```
