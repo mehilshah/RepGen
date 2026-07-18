@@ -80,11 +80,48 @@ findings:
 4. **LLM critique** — a structured judgement of whether the script reproduces the
    reported bug.
 
-A run succeeds when the static stages pass and the critique confirms the
-reproduction — all without executing untrusted generated code.
+Static verification always runs as a **pre-execution gate**: it catches broken
+scripts cheaply before any environment is built.
+
+## 5. Execution (optional, opt-out with `--no-execute`)
+
+Once a script passes static verification, the execution engine
+(`repgen/execution/`) runs it for real and checks whether the bug reproduces.
+
+```
+script ──► detect deps ──► PLAN (LLM + hardware) ──► gate ──► venv ──► install
+             (AST)          Quick / Medium / Large           (isolated)   │
+                                                                          ▼
+   verdict ◄── VERIFY (LLM + signature) ◄── RUN (stream stdout/stderr) ◄──┘
+     │                                                                    ▲
+     └──► refine (LLM analyzes logs) ──► retry ────────────────────────────
+```
+
+| Component | Responsibility |
+| --- | --- |
+| `hardware.py` | Detect CPU/RAM/GPU/disk (stdlib, optional `psutil`) |
+| `dependencies.py` | AST import scan → PyPI names, update `requirements.txt` |
+| `environment.py` | Create a per-run `venv`, stream `pip install` |
+| `planner.py` | LLM + hardware → complexity (Quick/Medium/Large) + estimate |
+| `runner.py` | Stream stdout/stderr, enforce timeout, parse tracebacks |
+| `reproduction.py` | Compare output vs report (LLM + signature/semantic) → verdict |
+| `frameworks.py` | Per-framework deps, run command, scaffold, test config |
+| `pipeline.py` | Orchestrate plan → prepare → run → verify → refine/retry |
+
+Complexity gating decides whether a run executes automatically (*Quick*), asks
+for confirmation (*Medium*), or offers execute/prepare-only/skip (*Large*). A
+reproduction that raises the *expected* exception is treated as success even
+though it exits non-zero, so a valid repro is never "refined away". The Rich UI
+in `repgen/ui/` renders streaming output, dependency status, collapsible logs,
+tracebacks, the reproduction verdict, and a final summary.
+
+Execution is **opt-out** (`--no-execute` / `execute = false`); the static
+pipeline above is unchanged and remains the fallback.
 
 ## Artifacts
 
 Every run writes `input_bug_report.txt`, `refined_report.txt`, `reproduce.py`,
 and `report.md` / `report.json` (exploration summary, plan, and per-attempt
-verification results) to the output directory.
+verification results) to the output directory. When execution runs it also
+writes `requirements.txt`, the per-run `.venv/`, and (for prepare-only runs)
+`run_commands.sh`.

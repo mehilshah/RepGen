@@ -29,10 +29,17 @@ def reproduce(
     output_dir: str = "./repgen_results",
     max_attempts: int = 3,
     max_explore_steps: int = 12,
+    execute: bool = False,
+    framework: Optional[str] = None,
 ) -> str:
     """Generate a reproduction script for a bug report + repository.
 
     Returns the generated script as a string; raises ``RuntimeError`` on failure.
+
+    Pass ``execute=True`` to also plan, build an isolated venv, run the script,
+    and verify reproduction (non-interactive: only Quick runs execute
+    automatically). The library default is ``False`` to keep ``reproduce`` free
+    of side effects such as venv creation.
     """
     from .core import RepGenService
 
@@ -46,6 +53,8 @@ def reproduce(
         api_key=api_key,
         max_attempts=max_attempts,
         max_explore_steps=max_explore_steps,
+        execute=execute,
+        framework=framework,
     )
     if result["success"] and result["files"]:
         return result["files"][0]["content"]

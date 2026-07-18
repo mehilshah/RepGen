@@ -11,12 +11,15 @@ from .agent.explorer import ExplorationAgent
 from .agent.generator import ReproductionGenerator
 from .agent.tools import RepoToolbox
 from .backends import get_backend
+from .execution import ExecutionPipeline
+from .execution.pipeline import ConfirmCb, ExecutionSettings
 from .inputs import (
     checkout_commit,
     checkout_to_date,
     fetch_content,
     prepare_repository,
 )
+from .projects.local import discover_local_modules
 from .prompts import refinement_prompt
 from .reporting import write_run_report
 
@@ -41,6 +44,11 @@ class RepGenService:
         max_explore_steps: int = 12,
         api_key: Optional[str] = None,
         progress_callback: ProgressCb = None,
+        execute: bool = False,
+        framework: Optional[str] = None,
+        exec_settings: Optional[ExecutionSettings] = None,
+        exec_progress_callback: ProgressCb = None,
+        confirm_callback: ConfirmCb = None,
     ) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "success": False,
@@ -48,6 +56,7 @@ class RepGenService:
             "files": [],
             "error": None,
             "run_dir": None,
+            "execution": None,
         }
         timings: Dict[str, float] = {}
 
@@ -147,7 +156,38 @@ class RepGenService:
                 timings=timings,
             )
             result["report"] = str(report_path)
-            notify("done", success=gen.success, run_dir=str(run_dir))
+
+            # 6. Execution (opt-in): plan → prepare venv → run → verify → refine.
+            if execute and gen.code:
+                notify("execute", message="Planning and executing reproduction...")
+                t0 = time.time()
+                try:
+                    local_modules = discover_local_modules(Path(local_repo_path))
+                except Exception:  # noqa: BLE001 - non-fatal
+                    local_modules = []
+                pipeline = ExecutionPipeline(
+                    client,
+                    settings=exec_settings or ExecutionSettings(),
+                    progress_cb=exec_progress_callback,
+                    confirm_cb=confirm_callback,
+                )
+                outcome = pipeline.run(
+                    gen.code,
+                    run_dir=run_dir,
+                    goal=refined,
+                    bug_report=refined,
+                    failure_signature=gen.failure_signature,
+                    framework=framework,
+                    local_modules=local_modules,
+                )
+                timings["execute"] = time.time() - t0
+                result["execution"] = outcome
+                # Reproduction verdict upgrades the top-level success signal.
+                if outcome.reproduced:
+                    result["success"] = True
+                    result["error"] = None
+
+            notify("done", success=result["success"], run_dir=str(run_dir))
             return result
 
         except Exception as e:  # noqa: BLE001 - surface a clean error to the CLI

@@ -10,6 +10,7 @@ from typing import Optional
 import requests
 
 from .base import LLMBackend, LLMResponse
+from .models import default_model, suggested_models
 
 logger = logging.getLogger("repgen.backends")
 
@@ -17,8 +18,8 @@ logger = logging.getLogger("repgen.backends")
 class GeminiBackend(LLMBackend):
     name = "gemini"
     env_key = "GEMINI_API_KEY"
-    default_model = "gemini-1.5-pro"
-    suggested_models = ("gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash")
+    default_model = default_model("gemini", "gemini-2.5-pro")
+    suggested_models = suggested_models("gemini")
     max_retries = 3
 
     def generate(

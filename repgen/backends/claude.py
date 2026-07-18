@@ -10,6 +10,7 @@ from typing import Optional
 import requests
 
 from .base import LLMBackend, LLMResponse
+from .models import default_model, suggested_models
 
 logger = logging.getLogger("repgen.backends")
 
@@ -17,12 +18,8 @@ logger = logging.getLogger("repgen.backends")
 class ClaudeBackend(LLMBackend):
     name = "claude"
     env_key = "ANTHROPIC_API_KEY"
-    default_model = "claude-sonnet-4-5"
-    suggested_models = (
-        "claude-sonnet-4-5",
-        "claude-opus-4-1",
-        "claude-3-5-sonnet-20241022",
-    )
+    default_model = default_model("claude", "claude-opus-4-8")
+    suggested_models = suggested_models("claude")
     max_retries = 3
     api_url = "https://api.anthropic.com/v1/messages"
 

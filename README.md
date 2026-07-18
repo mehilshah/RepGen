@@ -18,8 +18,10 @@
 **RepGen** is a command-line tool that uses Large Language Models to automatically
 reproduce bugs in software libraries. Given a bug report and a repository, an
 **exploration agent** navigates the codebase with tools (search, read, grep,
-symbol lookup), then generates a Python reproduction script that is checked by a
-**four-stage static verification loop** — *no generated code is ever executed*.
+symbol lookup), generates a Python reproduction script, checks it through a
+**four-stage static verification loop**, and then — in an isolated virtual
+environment — **actually runs it and verifies that the bug reproduces**,
+refining and retrying on failure.
 
 It is designed for Deep Learning libraries, where reproducing an issue (building a
 Minimum Reproducible Example) is often the hardest first step of debugging.
@@ -29,10 +31,22 @@ Minimum Reproducible Example) is often the hardest first step of debugging.
 - **Exploration-based retrieval.** Instead of a fixed pipeline, an agent explores
   the repo step by step (ReAct), gathering exactly the files, symbols, and
   signatures a reproduction needs.
-- **Five LLM backends.** `openai`, `claude`, `gemini`, `openrouter`, and `ollama`
-  (local, no API key) behind one interface — switch with a single flag.
-- **Static verification, no execution.** Every generated script passes through
-  four verifiers that produce structured, actionable feedback:
+- **Five LLM backends, latest models.** `openai`, `claude`, `gemini`,
+  `openrouter`, and `ollama` (local, no API key) behind one interface, with a
+  provider-agnostic catalog of state-of-the-art models (`repgen models`).
+- **Real execution + reproduction verification.** After static checks, RepGen
+  auto-detects dependencies, builds an isolated `venv`, and runs the script —
+  streaming output live — then compares the result against the bug report to
+  decide whether the bug **actually reproduced**, with a confidence score and
+  matching evidence. An LLM **execution planner** uses your hardware
+  (CPU/RAM/GPU/disk) to classify runs as Quick / Medium / Large and gate long
+  ones behind confirmation. Failed runs are analyzed, refined, and retried. Opt
+  out with `--no-execute` for the original static-only flow.
+- **Framework-aware & local projects.** Choose a target framework (FastAPI,
+  Flask, Django, Streamlit, or plain Python) for the right scaffold, deps, and
+  run command; open existing local projects or scaffold new ones (`repgen new`).
+- **Static verification gate.** Before anything runs, every generated script
+  passes through four verifiers that produce structured, actionable feedback:
   1. **syntax** — `ast` parse
   2. **compilation** — `compile()` + focused `pylint` binding checks
   3. **pseudo-symbolic execution** — an AST abstract interpreter that resolves
@@ -73,8 +87,12 @@ repgen run
 ## Usage
 
 ```bash
-repgen run            # explore → generate → verify a reproduction
+repgen run            # explore → generate → verify → execute a reproduction
 repgen backends       # show the 5 backends and which are configured
+repgen models         # list suggested state-of-the-art models per backend
+repgen frameworks     # list supported target frameworks
+repgen new PATH       # scaffold a new local project
+repgen open PATH      # inspect an existing local project
 repgen config show    # view effective configuration
 repgen config set backend claude
 repgen version
@@ -91,7 +109,10 @@ Common `run` options:
 | `--commit` | Check out a specific commit before analysis |
 | `--max-attempts` | Generation attempts per run (default 3) |
 | `--max-explore-steps` | Exploration budget (default 12) |
-| `-v, --verbose` | Stream every tool call and finding |
+| `-f, --framework` | `plain` · `fastapi` · `flask` · `django` · `streamlit` |
+| `--execute / --no-execute` | Run the script in an isolated venv and verify reproduction |
+| `--max-exec-retries` | Refine/retry attempts on execution failure (default 2) |
+| `-v, --verbose` | Stream every tool call, command, and finding |
 | `-y, --yes` | Non-interactive (fail if inputs are missing) |
 
 ### Configuration
@@ -133,16 +154,15 @@ print(script)
 ## How it works
 
 ```
-bug report ──► refine ──► EXPLORE (agent + tools) ──► generate ──► VERIFY ──► script
-                                │                                    │
-                     RetrievedContext + SymbolIndex ────────────────┘
-                          (feeds the symbolic verifier;
-                     unresolved symbols trigger re-exploration)
+bug report ─► refine ─► EXPLORE ─► generate ─► VERIFY (static) ─► EXECUTE ─► verdict
+                           │                        │              (venv)      │
+                RetrievedContext + SymbolIndex ─────┘         plan · run · refine/retry
+                     (unresolved symbols trigger re-exploration)
 ```
 
 Artifacts for every run are written to the output directory: the refined report,
-the generated `reproduce.py`, and `report.md` / `report.json` summarizing the
-exploration, the plan, and each verification attempt.
+the generated `reproduce.py`, `report.md` / `report.json`, and — when execution
+runs — the detected `requirements.txt` and the isolated `.venv/`.
 
 See the [documentation](docs/index.md) for the full architecture.
 

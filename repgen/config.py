@@ -23,6 +23,14 @@ DEFAULT_OUTPUT_DIR = "./repgen_results"
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_MAX_EXPLORE_STEPS = 12
 
+# Execution engine defaults.
+DEFAULT_EXECUTE = True  # execute-by-default (use --no-execute / execute=false to gate)
+DEFAULT_FRAMEWORK = "plain"
+DEFAULT_MAX_EXEC_RETRIES = 2
+DEFAULT_QUICK_TIMEOUT_S = 900
+DEFAULT_MEDIUM_TIMEOUT_S = 2700
+DEFAULT_LARGE_TIMEOUT_S = 5400
+
 
 def config_path() -> Path:
     """Location of the config file (override with ``$REPGEN_CONFIG``)."""
@@ -40,6 +48,13 @@ class RepGenConfig:
     output_dir: str = DEFAULT_OUTPUT_DIR
     max_attempts: int = DEFAULT_MAX_ATTEMPTS
     max_explore_steps: int = DEFAULT_MAX_EXPLORE_STEPS
+    # Execution engine.
+    execute: bool = DEFAULT_EXECUTE
+    framework: str = DEFAULT_FRAMEWORK
+    max_exec_retries: int = DEFAULT_MAX_EXEC_RETRIES
+    quick_timeout_s: int = DEFAULT_QUICK_TIMEOUT_S
+    medium_timeout_s: int = DEFAULT_MEDIUM_TIMEOUT_S
+    large_timeout_s: int = DEFAULT_LARGE_TIMEOUT_S
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "RepGenConfig":
@@ -80,7 +95,17 @@ class RepGenConfig:
                 f"Unknown config key '{key}'. Valid keys: "
                 f"{', '.join(self.__dataclass_fields__)}"
             )
-        if key in {"max_attempts", "max_explore_steps"}:
+        int_keys = {
+            "max_attempts",
+            "max_explore_steps",
+            "max_exec_retries",
+            "quick_timeout_s",
+            "medium_timeout_s",
+            "large_timeout_s",
+        }
+        if key in int_keys:
             setattr(self, key, int(value))
+        elif key == "execute":
+            setattr(self, key, str(value).strip().lower() in {"1", "true", "yes", "on"})
         else:
             setattr(self, key, value)

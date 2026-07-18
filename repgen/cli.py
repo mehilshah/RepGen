@@ -13,10 +13,14 @@ from rich.table import Table
 
 from . import __version__
 from .backends import BACKEND_NAMES, get_backend, list_backends
+from .backends.models import model_specs
 from .config import RepGenConfig, config_path
 from .console import configure_logging, console
 from .core import RepGenService
+from .execution.frameworks import FRAMEWORK_NAMES, get_framework, list_frameworks
+from .execution.pipeline import ExecutionSettings
 from .reporting import RunReporter
+from .ui import ExecutionReporter, interactive_confirm
 
 app = typer.Typer(
     add_completion=True,
@@ -26,6 +30,21 @@ app = typer.Typer(
 )
 config_app = typer.Typer(no_args_is_help=True, help="Manage RepGen configuration.")
 app.add_typer(config_app, name="config")
+
+
+def _prompt_framework() -> str:
+    console.print("\n[bold]Select a target Python framework:[/bold]")
+    fws = list_frameworks()
+    for i, fw in enumerate(fws, 1):
+        deps = ", ".join(fw.dependencies) if fw.dependencies else "stdlib only"
+        console.print(f"  {i}) {fw.display_name}  [dim]({deps})[/dim]")
+    choice = IntPrompt.ask(
+        "Choice",
+        choices=[str(i) for i in range(1, len(fws) + 1)],
+        show_choices=False,
+        default=1,
+    )
+    return fws[choice - 1].name
 
 
 def _banner() -> None:
@@ -105,6 +124,18 @@ def run(
     max_explore_steps: Optional[int] = typer.Option(
         None, "--max-explore-steps", help="Max exploration steps."
     ),
+    framework: Optional[str] = typer.Option(
+        None, "--framework", "-f",
+        help=f"Target framework ({', '.join(FRAMEWORK_NAMES)}).",
+    ),
+    execute: Optional[bool] = typer.Option(
+        None, "--execute/--no-execute",
+        help="Plan, prepare a venv, run and verify the reproduction "
+        "(default from config).",
+    ),
+    max_exec_retries: Optional[int] = typer.Option(
+        None, "--max-exec-retries", help="Max refine/retry attempts on failure."
+    ),
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Show detailed progress."
     ),
@@ -122,6 +153,17 @@ def run(
     output = output or cfg.output_dir
     max_attempts = max_attempts or cfg.max_attempts
     max_explore_steps = max_explore_steps or cfg.max_explore_steps
+    framework = framework or cfg.framework
+    execute = cfg.execute if execute is None else execute
+    max_exec_retries = (
+        cfg.max_exec_retries if max_exec_retries is None else max_exec_retries
+    )
+
+    if framework not in FRAMEWORK_NAMES:
+        if yes:
+            console.print(f"[error]Unknown framework '{framework}'.[/error]")
+            raise typer.Exit(1)
+        framework = _prompt_framework()
 
     if not bug_report:
         if yes:
@@ -155,6 +197,14 @@ def run(
         raise typer.Exit(1)
 
     reporter = RunReporter(verbose=verbose)
+    exec_reporter = ExecutionReporter(verbose=verbose)
+    exec_settings = ExecutionSettings(
+        enabled=execute,
+        max_retries=max_exec_retries,
+        quick_timeout_s=cfg.quick_timeout_s,
+        medium_timeout_s=cfg.medium_timeout_s,
+        large_timeout_s=cfg.large_timeout_s,
+    )
     service = RepGenService(output_dir=output)
     result = service.run_reproduction(
         bug_report_source=bug_report,
@@ -165,8 +215,17 @@ def run(
         max_attempts=max_attempts,
         max_explore_steps=max_explore_steps,
         progress_callback=reporter,
+        execute=execute,
+        framework=framework,
+        exec_settings=exec_settings,
+        exec_progress_callback=exec_reporter,
+        # In non-interactive mode there is no one to confirm Medium/Large runs,
+        # so the pipeline's built-in policy (run Quick, skip heavier) applies.
+        confirm_callback=None if yes else interactive_confirm,
     )
     reporter.summary(result)
+    if result.get("execution") is not None:
+        exec_reporter.summary(result["execution"])
     raise typer.Exit(0 if result["success"] else 2)
 
 
@@ -184,6 +243,104 @@ def backends() -> None:
             client.name, client.default_model, client.env_key or "(keyless)", mark
         )
     console.print(table)
+
+
+@app.command()
+def frameworks() -> None:
+    """List supported target Python frameworks."""
+    table = Table(title="Frameworks", header_style="bold magenta")
+    table.add_column("Name", style="cyan")
+    table.add_column("Display")
+    table.add_column("Base dependencies")
+    table.add_column("Entrypoint")
+    for fw in list_frameworks():
+        table.add_row(
+            fw.name,
+            fw.display_name,
+            ", ".join(fw.dependencies) or "(stdlib only)",
+            fw.entrypoint,
+        )
+    console.print(table)
+
+
+@app.command()
+def models(
+    backend: Optional[str] = typer.Option(
+        None, "--backend", help=f"Backend to list models for ({', '.join(BACKEND_NAMES)})."
+    ),
+) -> None:
+    """List suggested state-of-the-art models per backend."""
+    names = [backend] if backend else BACKEND_NAMES
+    for name in names:
+        specs = model_specs(name)
+        if not specs:
+            continue
+        table = Table(title=f"{name} models", header_style="bold magenta")
+        table.add_column("Model ID", style="cyan")
+        table.add_column("Label")
+        table.add_column("Tags")
+        table.add_column("Default", justify="center")
+        for spec in specs:
+            mark = "[green]★[/green]" if spec.default else ""
+            table.add_row(spec.id, spec.label, ", ".join(spec.tags), mark)
+        console.print(table)
+
+
+@app.command("new")
+def new_project(
+    path: str = typer.Argument(..., help="Directory for the new local project."),
+    framework: Optional[str] = typer.Option(
+        None, "--framework", "-f",
+        help=f"Framework scaffold ({', '.join(FRAMEWORK_NAMES)}).",
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Scaffold into a non-empty directory."
+    ),
+) -> None:
+    """Create and scaffold a new local Python project for a chosen framework."""
+    from .projects import create_project
+
+    if not framework:
+        framework = _prompt_framework()
+    try:
+        project = create_project(path, framework=framework, exist_ok=force)
+    except (FileExistsError, ValueError) as e:
+        console.print(f"[error]{e}[/error]")
+        raise typer.Exit(1)
+    fw = get_framework(project.framework)
+    console.print(
+        f"[success]Created {fw.display_name} project at {project.path}[/success]"
+    )
+    console.print(
+        f"[dim]Run: repgen run --repo {project.path} "
+        f"--framework {project.framework} -b <backend>[/dim]"
+    )
+
+
+@app.command("open")
+def open_project_cmd(
+    path: str = typer.Argument(..., help="Path to an existing local project."),
+) -> None:
+    """Open an existing local Python project and show what RepGen detected."""
+    from .projects import open_project
+
+    try:
+        project = open_project(path)
+    except (FileNotFoundError, NotADirectoryError) as e:
+        console.print(f"[error]{e}[/error]")
+        raise typer.Exit(1)
+    fw = get_framework(project.framework)
+    table = Table(title=f"Project: {project.path}", header_style="bold magenta")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Framework (detected)", fw.display_name)
+    table.add_row("Local modules", ", ".join(project.local_modules) or "(none)")
+    table.add_row("requirements.txt", "yes" if project.requirements_path.exists() else "no")
+    console.print(table)
+    console.print(
+        f"[dim]Run: repgen run --repo {project.path} "
+        f"--framework {project.framework} -b <backend>[/dim]"
+    )
 
 
 @app.command()

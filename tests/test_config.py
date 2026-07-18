@@ -32,3 +32,34 @@ def test_set_unknown_key_raises():
 def test_to_dict_omits_none():
     cfg = RepGenConfig(model=None)
     assert "model" not in cfg.to_dict()
+
+
+def test_execution_defaults():
+    cfg = RepGenConfig()
+    assert cfg.execute is True
+    assert cfg.framework == "plain"
+    assert cfg.max_exec_retries == 2
+
+
+def test_set_execute_bool():
+    cfg = RepGenConfig()
+    cfg.set("execute", "false")
+    assert cfg.execute is False
+    cfg.set("execute", "yes")
+    assert cfg.execute is True
+
+
+def test_set_timeout_int():
+    cfg = RepGenConfig()
+    cfg.set("large_timeout_s", "6000")
+    assert cfg.large_timeout_s == 6000
+
+
+def test_execution_fields_roundtrip(tmp_path):
+    path = tmp_path / "config.toml"
+    cfg = RepGenConfig(execute=False, framework="fastapi", max_exec_retries=5)
+    cfg.save(path)
+    loaded = RepGenConfig.load(path)
+    assert loaded.execute is False
+    assert loaded.framework == "fastapi"
+    assert loaded.max_exec_retries == 5

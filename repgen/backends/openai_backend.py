@@ -8,6 +8,7 @@ import time
 from typing import Optional
 
 from .base import LLMBackend, LLMResponse
+from .models import default_model, suggested_models
 
 logger = logging.getLogger("repgen.backends")
 
@@ -85,29 +86,24 @@ class OpenAICompatibleBackend(LLMBackend):
 class OpenAIBackend(OpenAICompatibleBackend):
     name = "openai"
     env_key = "OPENAI_API_KEY"
-    default_model = "gpt-4o"
-    suggested_models = ("gpt-4o", "gpt-4o-mini", "gpt-4-turbo")
+    default_model = default_model("openai", "gpt-4o")
+    suggested_models = suggested_models("openai")
     base_url = None
 
 
 class OpenRouterBackend(OpenAICompatibleBackend):
     name = "openrouter"
     env_key = "OPENROUTER_API_KEY"
-    default_model = "openai/gpt-4o"
-    suggested_models = (
-        "openai/gpt-4o",
-        "anthropic/claude-3.5-sonnet",
-        "google/gemini-pro-1.5",
-        "meta-llama/llama-3.1-70b-instruct",
-    )
+    default_model = default_model("openrouter", "openai/gpt-4o")
+    suggested_models = suggested_models("openrouter")
     base_url = "https://openrouter.ai/api/v1"
 
 
 class OllamaBackend(OpenAICompatibleBackend):
     name = "ollama"
     env_key = None  # local, keyless
-    default_model = "llama3.1"
-    suggested_models = ("llama3.1", "qwen2.5-coder", "codellama", "mistral")
+    default_model = default_model("ollama", "llama3.1")
+    suggested_models = suggested_models("ollama")
 
     @property
     def base_url(self) -> str:  # type: ignore[override]
