@@ -1,68 +1,52 @@
-# Testing RepGen Ecosystem
+# Testing RepGen
 
-This guide explains how to manually verify each component of the RepGen ecosystem.
+## Automated tests
 
-## 1. Verifying the API Server
+```bash
+pip install -e ".[dev]"
+pytest
+```
 
-The API is the core of the ecosystem. It must be running for the UI and Extensions to work.
+The suite covers the backend registry, configuration, repository tools, the
+exploration loop, and all four static verifiers — no network access required.
 
-### Steps
-1. **Start the Server**:
-   ```bash
-   uvicorn repgen.server:app --reload
-   ```
-2. **Check Health**:
-   Open http://localhost:8000/docs in your browser. You should see the Swagger UI.
+## Manual CLI checks (no API key)
 
-3. **Test Endpoint** (Optional):
-   You can trigger a dry-run task via `curl` (requires a valid repo/bug report, but you can just check if it accepts the request):
-   ```bash
-   curl -X POST "http://localhost:8000/api/reproduce" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "bug_report": "https://github.com/example/repo/issues/1",
-       "repo_url": "https://github.com/example/repo",
-       "backend": "openai",
-       "model": "gpt-4o"
-     }'
-   ```
-   You should receive a JSON response with a `"task_id"`.
+```bash
+repgen version
+repgen backends           # ollama shows as configured (keyless)
+repgen config show
+```
 
----
+## End-to-end reproduction
 
-## 2. Verifying the Web UI
+Using a local model via Ollama (no API key):
 
-The Web UI allows you to start and monitor tasks visually.
+```bash
+# In another terminal: `ollama serve` then `ollama pull llama3.1`
+repgen run \
+  -b https://github.com/owner/repo/issues/123 \
+  -r https://github.com/owner/repo.git \
+  --backend ollama --model llama3.1 --verbose
+```
 
-### Steps
-1. **Ensure API is running** (see above).
-2. **Setup UI**:
-   ```bash
-   cd ui
-   npm install
-   ```
-3. **Start Dev Server**:
-   ```bash
-   npm run dev
-   ```
-4. **Test Flow**:
-   - Open http://localhost:5173.
-   - Enter a Bug Report URL and Repo URL.
-   - Click **Start Reproduction**.
-   - Verify that the status changes to "Running" and logs appear in the console window.
+Or with a hosted backend:
 
-## 3. Verifying Docker
+```bash
+export OPENAI_API_KEY="sk-..."
+repgen run -b ./bug.txt -r ./path/to/repo --backend openai --yes
+```
 
-Run the entire stack in a container.
+Confirm that:
 
-### Steps
-1. **Build Image**:
-   ```bash
-   docker build -t repgen .
-   ```
-2. **Run Container**:
-   ```bash
-   docker run -p 8000:8000 repgen
-   ```
-3. **Verify**:
-   - Visit http://localhost:8000/docs to confirm the server is reachable from the host.
+1. exploration tool calls stream in the live view (`--verbose`),
+2. each attempt reports `syntax · compilation · symbolic · critique` status,
+3. `reproduce.py`, `report.md`, and `report.json` are written to the run
+   directory printed at the end.
+
+## Docker
+
+```bash
+docker build -t repgen .
+docker run --rm repgen backends
+```

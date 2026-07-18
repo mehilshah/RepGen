@@ -1,35 +1,54 @@
-import os
+"""RepGen Python API examples.
 
-from repgen import reproduce
+Run the whole file, or call one of the two functions below. Set the relevant API
+key first (e.g. ``export OPENAI_API_KEY=...``), or use the keyless ``ollama``
+backend with a local server (``ollama serve`` + ``ollama pull llama3.1``).
+"""
+
+from repgen import RepGenService, reproduce
+
+BUG_REPORT = "https://github.com/example/repo/issues/1"
+REPO = "https://github.com/example/repo.git"
 
 
-def main():
-    # define inputs
-    bug_report_source = "https://github.com/example/repo/issues/1"
-    repo_source = "https://github.com/example/repo"
-    backend = "openai"
-    model = "gpt-4o"
-    api_key = os.environ.get("OPENAI_API_KEY", "your-api-key-here")
+def simple() -> None:
+    """One-liner: return the generated reproduction script as a string."""
+    script = reproduce(
+        bug_report_source=BUG_REPORT,
+        repo_source=REPO,
+        backend="openai",  # openai | claude | gemini | openrouter | ollama
+        model="gpt-4o",  # optional; each backend has a sensible default
+    )
+    print(script)
 
-    print("Running RepGen reproduction...")
 
-    try:
-        # Simple one-function usage
-        code_snippet = reproduce(
-            bug_report_source=bug_report_source,
-            repo_source=repo_source,
-            backend=backend,
-            model=model,
-            api_key=api_key,
-        )
+def detailed() -> None:
+    """Full run: stream progress and inspect artifacts + verification results."""
 
-        print("\n=== Generated Reproduction Script ===\n")
-        print(code_snippet)
-        print("\n=====================================\n")
+    def on_event(event: str, data: dict) -> None:
+        # Events include: setup, refine, explore.action, generate.attempt_verified, done
+        print(f"[{event}] {data.get('message', '')}")
 
-    except Exception as e:
-        print("Error: {}".format(e))
+    service = RepGenService(output_dir="./repgen_results")
+    result = service.run_reproduction(
+        bug_report_source=BUG_REPORT,
+        repo_source=REPO,
+        backend="ollama",
+        model="llama3.1",
+        max_attempts=3,
+        max_explore_steps=12,
+        progress_callback=on_event,
+    )
+
+    print(f"\nVerified: {result['success']}")
+    print(f"Run directory: {result['run_dir']}")
+    print(f"Report: {result.get('report')}")
+    for file_info in result["files"]:
+        print(f"Generated: {file_info['path']}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        simple()
+    except Exception as e:  # noqa: BLE001 - example only
+        print(f"Error: {e}")

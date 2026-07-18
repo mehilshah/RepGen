@@ -1,26 +1,28 @@
-import json
+"""RepGenService: orchestrates the exploration-based reproduction pipeline."""
+
+from __future__ import annotations
+
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
-from .retrieval.pipeline import RetrievalPipeline
-from .utils import (
-    _build_prompt,
-    check_relevance,
-    check_structural_correctness,
+from .agent.explorer import ExplorationAgent
+from .agent.generator import ReproductionGenerator
+from .agent.tools import RepoToolbox
+from .backends import get_backend
+from .inputs import (
     checkout_commit,
     checkout_to_date,
-    clean_context,
-    create_prompt_plan,
-    create_prompt_refinement,
-    extract_json_content,
     fetch_content,
     prepare_repository,
-    query_llm,
 )
+from .prompts import refinement_prompt
+from .reporting import write_run_report
 
 logger = logging.getLogger("repgen.core")
+
+ProgressCb = Optional[Callable[[str, Dict[str, Any]], None]]
 
 
 class RepGenService:
@@ -33,211 +35,123 @@ class RepGenService:
         bug_report_source: str,
         repo_source: str,
         backend: str,
-        model: str,
+        model: Optional[str] = None,
         commit: Optional[str] = None,
         max_attempts: int = 3,
+        max_explore_steps: int = 12,
         api_key: Optional[str] = None,
-        progress_callback=None,
+        progress_callback: ProgressCb = None,
     ) -> Dict[str, Any]:
-        """
-        Executes the full reproduction pipeline.
+        result: Dict[str, Any] = {
+            "success": False,
+            "project_id": "",
+            "files": [],
+            "error": None,
+            "run_dir": None,
+        }
+        timings: Dict[str, float] = {}
 
-        Args:
-            bug_report_source: URL or path to bug report
-            repo_source: URL or path to repository
-            backend: LLM backend (openai, gemini, claude)
-            model: Model name
-            commit: Optional commit hash
-            max_attempts: Max retry attempts per context
-            api_key: Optional API key for backend
-            progress_callback: Optional function(stage, message)
-
-        Returns:
-            Dict containing results and paths
-        """
-        result = {"success": False, "project_id": "", "files": [], "error": None}
-
-        def notify(stage, msg, data=None):
+        def notify(event: str, **data: Any) -> None:
             if progress_callback:
-                progress_callback(stage, msg, data)
-            logger.info(f"[{stage}] {msg}")
+                progress_callback(event, data)
 
         try:
-            # 1. Prepare Inputs
-            notify("setup", "Fetching inputs...")
+            client = get_backend(backend, model, api_key)
+
+            # 1. Inputs
+            notify("setup", message="Fetching bug report and repository...")
+            t0 = time.time()
             bug_report_content, created_at = fetch_content(bug_report_source)
             local_repo_path = prepare_repository(repo_source)
 
             if commit:
-                notify("setup", f"Checking out commit {commit}...")
+                notify("setup", message=f"Checking out commit {commit}...")
                 if not checkout_commit(local_repo_path, commit):
-                    raise RuntimeError("Failed to checkout commit")
+                    raise RuntimeError(f"Failed to checkout commit {commit}")
             elif created_at:
-                notify("setup", f"Checking out repository state from {created_at}...")
-                if not checkout_to_date(local_repo_path, created_at):
-                    logger.warning(f"Failed to checkout date {created_at}, continuing with current state.")
+                notify("setup", message=f"Time-traveling repo to {created_at}...")
+                checkout_to_date(local_repo_path, created_at)
+            timings["setup"] = time.time() - t0
 
-            # 2. Initialize Pipeline
-            # Create a unique project ID/folder
             project_id = f"RepGen_Run_{int(time.time())}"
             run_dir = self.output_dir / project_id
             run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "input_bug_report.txt").write_text(bug_report_content)
+            result["project_id"] = project_id
+            result["run_dir"] = str(run_dir)
 
-            local_bug_report_path = run_dir / "input_bug_report.txt"
-            local_bug_report_path.write_text(bug_report_content)
+            # 2. Refine bug report
+            notify("refine", message="Refining bug report...")
+            t0 = time.time()
+            refined = client.generate(
+                refinement_prompt(bug_report_content), max_tokens=1500
+            ).text
+            refined = refined or bug_report_content
+            (run_dir / "refined_report.txt").write_text(refined)
+            timings["refine"] = time.time() - t0
+            notify("refine_done", refined=refined)
 
-            notify("retrieval", "Initializing Retrieval Pipeline...")
-            pipeline = RetrievalPipeline(
-                repo_path=local_repo_path,
-                bug_report_path=str(local_bug_report_path),
-                output_dir=str(self.output_dir),
+            # 3. Exploration
+            notify("explore", message="Exploring repository...")
+            t0 = time.time()
+            toolbox = RepoToolbox(local_repo_path)
+            explorer = ExplorationAgent(
+                client,
+                toolbox,
+                max_steps=max_explore_steps,
+                progress_cb=lambda ev, d: notify(f"explore.{ev}", **d),
             )
-
-            # 3. Retrieval
-            notify("retrieval", "Running Code Retrieval...")
-            ret_result = pipeline.run_pipeline()
-            if not ret_result:
-                raise RuntimeError("Retrieval failed to find relevant code")
-
-            # 4. Refinement
-            notify("refinement", "Refining Bug Report...")
-            refined_report = query_llm(
-                create_prompt_refinement(bug_report_content),
-                backend,
-                model,
-                api_key=api_key,
-            )
-            if not refined_report:
-                refined_report = bug_report_content
-
-            refined_path = (
-                pipeline.config.REFINED_BUG_REPORT_DIR_OUT / "refined_report.txt"
-            )
-            refined_path.write_text(refined_report)
+            context = explorer.explore(refined)
+            timings["explore"] = time.time() - t0
             notify(
-                "refinement",
-                "Bug Report Refined",
-                data={"type": "refined_report", "content": refined_report},
+                "explore_done",
+                files=context.key_files,
+                symbols=list(context.symbol_index.all_symbols().keys()),
             )
 
-            # 5. Generation
-            context_files = sorted(list(pipeline.config.CONTEXT_DIR_OUT.glob("*.json")))
-            if not context_files:
-                raise RuntimeError("No context files generated")
-
-            notify(
-                "generation",
-                f"Starting generation for {len(context_files)} contexts...",
+            # 4. Generation + feedback loop
+            notify("generate", message="Generating reproduction script...")
+            t0 = time.time()
+            generator = ReproductionGenerator(
+                client, progress_cb=lambda ev, d: notify(f"generate.{ev}", **d)
             )
+            gen = generator.generate(
+                refined,
+                context,
+                max_attempts=max_attempts,
+                explorer=explorer,
+            )
+            timings["generate"] = time.time() - t0
 
-            successful_gen = False
-            generated_script_path = None
+            # 5. Persist artifacts
+            if gen.code:
+                script_path = run_dir / "reproduce.py"
+                script_path.write_text(gen.code)
+                result["files"].append({"path": str(script_path), "content": gen.code})
 
-            for idx, ctx_file in enumerate(context_files, 1):
-                ctx_num = ctx_file.stem.split("_")[-1]
-                notify("generation", f"Processing Context {idx}/{len(context_files)}")
-
-                with open(ctx_file, "r") as f:
-                    ctx_content = f.read()
-
-                notify(
-                    "generation",
-                    f"Context {ctx_num} Loaded",
-                    data={
-                        "type": "context",
-                        "content": ctx_content,
-                        "index": idx,
-                    },
+            result["success"] = gen.success
+            if not gen.success:
+                result["error"] = (
+                    "No attempt passed static verification; wrote best-effort script."
+                    if gen.code
+                    else "Failed to generate a reproduction script."
                 )
 
-                # Plan
-                plan_raw = query_llm(
-                    create_prompt_plan(refined_report, json.loads(ctx_content)),
-                    backend,
-                    model,
-                    api_key=api_key,
-                )
-                plan = extract_json_content(plan_raw) or "[]"
-                notify(
-                    "generation",
-                    f"Plan Generated for Context {ctx_num}",
-                    data={"type": "plan", "content": plan, "index": idx},
-                )
-
-                prompt_code = _build_prompt(refined_report, ctx_content, plan)
-
-                # Attempts
-                for attempt in range(1, max_attempts + 1):
-                    notify("generation", f"Context {ctx_num} - Attempt {attempt}")
-
-                    raw_code = query_llm(prompt_code, backend, model, api_key=api_key)
-                    code = extract_json_content(raw_code) or raw_code
-
-                    is_valid, err = check_structural_correctness(code)
-                    if err:
-                        notify(
-                            "generation",
-                            f"Context {ctx_num} - Attempt {attempt} - Syntax Error",
-                            data={"type": "feedback", "content": err, "code": code},
-                        )
-                        prompt_code = _build_prompt(
-                            refined_report,
-                            ctx_content,
-                            plan,
-                            feedback=f"Syntax Error: {err}",
-                        )
-                        continue
-
-                    if not check_relevance(
-                        refined_report, code, backend, model, api_key=api_key
-                    ):
-                        notify(
-                            "generation",
-                            f"Context {ctx_num} - Attempt {attempt} - Irrelevant",
-                            data={
-                                "type": "feedback",
-                                "content": "Code deemed irrelevant",
-                                "code": code,
-                            },
-                        )
-                        continue
-
-                    # Success
-                    generated_script_path = (
-                        pipeline.config.REPRODUCTION_DIR_OUT / f"reproduce_{ctx_num}.py"
-                    )
-                    generated_script_path.write_text(code)
-
-                    successful_gen = True
-                    result["success"] = True
-
-                    result["files"].append(
-                        {"path": str(generated_script_path), "content": code}
-                    )
-                    notify(
-                        "generation",
-                        "Reproduction Successful",
-                        data={
-                            "type": "code",
-                            "content": code,
-                        },
-                    )
-                    break
-
-                if successful_gen:
-                    break
-
-            if not successful_gen:
-                result["error"] = "Failed to generate valid script after all attempts"
-
-            result["project_id"] = pipeline.config.PROJECT_ID
+            report_path = write_run_report(
+                run_dir,
+                backend=backend,
+                model=client.model,
+                refined_report=refined,
+                context=context,
+                generation=gen,
+                timings=timings,
+            )
+            result["report"] = str(report_path)
+            notify("done", success=gen.success, run_dir=str(run_dir))
             return result
 
-        except RuntimeError as e:
-            logger.error(f"Pipeline flow error: {e}")
+        except Exception as e:  # noqa: BLE001 - surface a clean error to the CLI
+            logger.exception("Reproduction failed")
             result["error"] = str(e)
-            return result
-        except Exception as e:
-            logger.exception("Unexpected reproduction failure")
-            result["error"] = f"Unexpected error: {str(e)}"
+            notify("error", message=str(e))
             return result

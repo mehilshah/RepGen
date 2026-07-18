@@ -1,35 +1,41 @@
+"""RepGen: exploration-based automated bug reproduction with LLMs."""
+
+from __future__ import annotations
+
 from typing import Optional
 
-from .core import RepGenService
+__version__ = "1.0.0"
+
+__all__ = ["reproduce", "RepGenService", "__version__"]
+
+
+def __getattr__(name: str):
+    # Lazy imports keep `import repgen` fast and avoid pulling heavy optional
+    # dependencies until they are actually needed.
+    if name == "RepGenService":
+        from .core import RepGenService
+
+        return RepGenService
+    raise AttributeError(f"module 'repgen' has no attribute {name!r}")
 
 
 def reproduce(
     bug_report_source: str,
     repo_source: str,
     backend: str,
-    model: str,
+    model: Optional[str] = None,
     api_key: Optional[str] = None,
     commit: Optional[str] = None,
     output_dir: str = "./repgen_results",
+    max_attempts: int = 3,
+    max_explore_steps: int = 12,
 ) -> str:
+    """Generate a reproduction script for a bug report + repository.
+
+    Returns the generated script as a string; raises ``RuntimeError`` on failure.
     """
-    Generates a reproduction script for a given bug report and repository.
+    from .core import RepGenService
 
-    Args:
-        bug_report_source: URL or path to the bug report.
-        repo_source: URL or path to the repository.
-        backend: The LLM backend to use (openai, gemini, claude).
-        model: The model name to use.
-        api_key: API key for the backend (optional).
-        commit: Specific commit hash to checkout (optional).
-        output_dir: Directory to store intermediate artifacts (default: "./repgen_results").
-
-    Returns:
-        The generated reproduction script as a string.
-
-    Raises:
-        RuntimeError: If reproduction fails.
-    """
     service = RepGenService(output_dir=output_dir)
     result = service.run_reproduction(
         bug_report_source=bug_report_source,
@@ -38,14 +44,9 @@ def reproduce(
         model=model,
         commit=commit,
         api_key=api_key,
+        max_attempts=max_attempts,
+        max_explore_steps=max_explore_steps,
     )
-
     if result["success"] and result["files"]:
-        # Return the content of the first generated file (usually the reproduction script)
         return result["files"][0]["content"]
-    else:
-        error_msg = result.get("error", "Unknown error during reproduction")
-        raise RuntimeError(f"Reproduction failed: {error_msg}")
-
-
-__all__ = ["reproduce", "RepGenService"]
+    raise RuntimeError(f"Reproduction failed: {result.get('error', 'unknown error')}")

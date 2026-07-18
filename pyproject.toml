@@ -4,45 +4,62 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "repgen-ai"
-version = "0.1.0"
-description = "Automated reproduction generation for bug reports using LLMs"
+version = "1.0.0"
+description = "Exploration-based, CLI-first automated bug reproduction with LLMs"
 readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
 authors = [
   { name = "Mehil Shah", email = "shahmehil@dal.ca" },
 ]
+keywords = ["llm", "bug-reproduction", "agent", "cli", "deep-learning"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
 ]
-requires-python = ">=3.8"
+
+# Dependency-light by design: retrieval is LLM-driven over an AST "repo map" plus
+# a pure-Python BM25 index, so there is no torch / embedding-model install.
 dependencies = [
-    "annoy",
-    "numpy",
-    "pylint",
-    "rank_bm25",
-    "requests",
-    "scikit_learn",
-    "sentence_transformers",
-    "torch",
-    "transformers",
-    "pandas",
-    "openai",
-    "rich",
+    "typer>=0.12",
+    "rich>=13.0",
+    "requests>=2.28",
+    "openai>=1.0",
+    "pylint>=3.0",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+docs = [
     "mkdocs",
     "mkdocs-material",
-    "watchfiles",
+]
+dev = [
+    "pytest",
     "black",
     "isort",
-    "mypy",
     "flake8",
+    "mypy",
     "pre-commit",
-    "rich-argparse",
+    "build",
 ]
+
+[project.scripts]
+repgen = "repgen.cli:app"
 
 [project.urls]
 "Homepage" = "https://github.com/mehilshah/RepGen"
+"Documentation" = "https://github.com/mehilshah/RepGen"
 "Bug Tracker" = "https://github.com/mehilshah/RepGen/issues"
+
+[tool.setuptools.packages.find]
+include = ["repgen*"]
 
 [tool.isort]
 profile = "black"
+
+[tool.black]
+line-length = 88

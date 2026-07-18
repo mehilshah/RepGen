@@ -1,34 +1,42 @@
 # Installation
 
 ## Prerequisites
-- **Python**: 3.8 or higher
+
+- **Python** 3.9 or higher
 - **Git**
 
-## Option A: Virtual Environment (Recommended)
-
-To avoid conflicts with system packages, we recommend installing in a virtual environment.
+## Option A: pip (recommended)
 
 ```bash
-# 1. Create a virtual environment
 python3 -m venv venv
+source venv/bin/activate        # Windows: .\venv\Scripts\activate
 
-# 2. Activate it
-# On Mac/Linux:
-source venv/bin/activate
-# On Windows:
-# .\venv\Scripts\activate
-
-# 3. Install RepGen
 git clone https://github.com/mehilshah/RepGen
 cd RepGen
+
+# One lightweight install — no ML stack, no model downloads
 pip install -e .
 ```
 
+The install is intentionally small so the tool is fast to adopt. Retrieval is
+LLM-driven over a pure-Python repo map + BM25 index, so there is no `torch` or
+embedding-model dependency.
+
 ## Option B: Docker
 
-Run the entire stack in an isolated container.
+The image installs the CLI and uses `repgen` as its entrypoint.
 
 ```bash
 docker build -t repgen .
-docker run -p 8000:8000 repgen
+docker run --rm repgen backends
+docker run --rm -e OPENAI_API_KEY repgen run \
+  -b https://github.com/owner/repo/issues/123 \
+  -r https://github.com/owner/repo.git --backend openai --yes
+```
+
+## Verify
+
+```bash
+repgen version
+repgen backends
 ```

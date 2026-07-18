@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  python-build:
-    name: Build Python Package
+  test:
+    name: Lint & Test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -21,13 +21,21 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Install dependencies
+    - name: Install (core + dev)
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        pip install build
+        pip install ".[dev]"
 
-    - name: Build Package
+    - name: Lint
+      run: |
+        flake8 repgen
+        black --check repgen
+        isort --check-only repgen
+
+    - name: Test
+      run: pytest -q
+
+    - name: Build package
       run: python -m build
 
   docker-build:
@@ -43,7 +51,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        files: Dockerfile
+        file: Dockerfile
         push: false
         tags: repgen:latest
         cache-from: type=gha
