@@ -1,0 +1,67 @@
+name: RepGen (full example)
+
+# A fully-loaded example of the RepGen composite action, exercising EVERY input.
+# Copy this into YOUR repo's `.github/workflows/` and delete the inputs you don't
+# need — every `with:` key below is optional except that RepGen needs an issue to
+# work on and an LLM key to call. Most people only need `backend:` + one secret;
+# see `repgen-repro.yml` for the minimal version.
+
+on:
+  issues:
+    types: [labeled]
+
+# Only run for the label we care about (customizable — see `LABEL` note below).
+# Cancel an in-flight run if the same issue is re-labeled.
+concurrency:
+  group: repgen-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  reproduce:
+    name: Reproduce labeled issue
+    # Change 'needs-repro' to whatever label should trigger a reproduction.
+    if: github.event.label.name == 'needs-repro'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read      # checkout + let RepGen time-travel the repo history
+      issues: write       # post the reproduction back as an issue comment
+
+    steps:
+      - name: Checkout (full history for time-travel)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 0 = all history; required so RepGen can rewind to the bug date
+
+      - name: Run RepGen
+        uses: mehilshah/RepGen@v1
+        with:
+          # ─── LLM backend ───────────────────────────────────────────────
+          backend: openai                  # openai | anthropic | gemini | openrouter
+          model: gpt-4o                     # pin a model; omit for the backend default
+
+          # ─── What to reproduce ─────────────────────────────────────────
+          issue-url: ""                     # empty = the issue that triggered this run;
+                                            # set a URL to reproduce a specific issue
+
+          # ─── Depth / effort knobs ──────────────────────────────────────
+          execute: "true"                   # true = also run + verify; false = static checks only
+          reasoning-effort: high            # low | medium | high
+          max-attempts: "3"                 # max generation attempts per run
+
+          # ─── Output / reporting ────────────────────────────────────────
+          output: repgen_results            # directory RepGen writes results to
+          comment: "true"                   # true = post reproduction back on the issue
+
+          # ─── Plumbing ──────────────────────────────────────────────────
+          repgen-ref: ""                    # pip target, e.g. 'repgen-ai==0.2.0'; empty = this action's ref
+          python-version: "3.12"            # Python RepGen runs on
+          github-token: ${{ secrets.GITHUB_TOKEN }}   # read the issue + post the comment
+
+        env:
+          # Provide the ONE key that matches `backend:` above. The others can be
+          # left out entirely — unused keys are simply ignored.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

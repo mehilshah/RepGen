@@ -1,5 +1,9 @@
 name: RepGen Reproduce Issue
 
+# TEMPLATE — copy this file into YOUR project's `.github/workflows/` directory.
+# It is meant to run in the repository whose issues you want reproduced, not in
+# the RepGen repo itself.
+#
 # Label an issue with `needs-repro` and RepGen will generate a reproduction
 # script for it and post the result back as a comment on that issue.
 #

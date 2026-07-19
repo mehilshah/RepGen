@@ -176,9 +176,36 @@ script and posts it back as a comment on that issue.
 issue labeled `needs-repro` ─► RepGen (Action) ─► comment with reproduction + report
 ```
 
-The workflow lives at [`.github/workflows/repgen-repro.yml`](.github/workflows/repgen-repro.yml).
-See [docs/github-action.md](docs/github-action.md) for one-time setup (add your
-LLM key as a repo secret, create the label) and customization.
+Add this workflow to **your** repo (the one whose issues you want reproduced):
+
+```yaml
+# .github/workflows/repgen.yml
+name: RepGen
+on:
+  issues:
+    types: [labeled]
+jobs:
+  reproduce:
+    if: github.event.label.name == 'needs-repro'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }   # full history so RepGen can time-travel
+      - uses: mehilshah/RepGen@v1
+        with:
+          backend: openai
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+```
+
+That's it — the reusable action ([`action.yml`](action.yml)) does the install,
+run, and comment. Prefer to vendor the full workflow instead? Copy
+[`examples/github-action/repgen-repro.yml`](examples/github-action/repgen-repro.yml).
+See [docs/github-action.md](docs/github-action.md) for one-time setup (LLM key
+secret, the `needs-repro` label) and all inputs.
 
 ## Contributing
 
