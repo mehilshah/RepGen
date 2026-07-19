@@ -19,6 +19,7 @@ except ModuleNotFoundError:  # pragma: no cover - <3.11 fallback
     import tomli as tomllib  # type: ignore
 
 DEFAULT_BACKEND = "openai"
+DEFAULT_REASONING_EFFORT = "medium"  # low | medium | high — how hard to think
 DEFAULT_OUTPUT_DIR = "./repgen_results"
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_MAX_EXPLORE_STEPS = 12
@@ -30,6 +31,10 @@ DEFAULT_MAX_EXEC_RETRIES = 2
 DEFAULT_QUICK_TIMEOUT_S = 900
 DEFAULT_MEDIUM_TIMEOUT_S = 2700
 DEFAULT_LARGE_TIMEOUT_S = 5400
+# Token budget for the LLM complexity planner. Reasoning models spend this
+# budget on internal reasoning too, so a tight cap can starve the answer and
+# force the heuristic fallback — hence it is the user's to tune.
+DEFAULT_PLANNER_MAX_TOKENS = 4096
 
 
 def config_path() -> Path:
@@ -44,6 +49,7 @@ def config_path() -> Path:
 @dataclass
 class RepGenConfig:
     backend: str = DEFAULT_BACKEND
+    reasoning_effort: str = DEFAULT_REASONING_EFFORT
     model: Optional[str] = None
     output_dir: str = DEFAULT_OUTPUT_DIR
     max_attempts: int = DEFAULT_MAX_ATTEMPTS
@@ -55,6 +61,7 @@ class RepGenConfig:
     quick_timeout_s: int = DEFAULT_QUICK_TIMEOUT_S
     medium_timeout_s: int = DEFAULT_MEDIUM_TIMEOUT_S
     large_timeout_s: int = DEFAULT_LARGE_TIMEOUT_S
+    planner_max_tokens: int = DEFAULT_PLANNER_MAX_TOKENS
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "RepGenConfig":
@@ -102,6 +109,7 @@ class RepGenConfig:
             "quick_timeout_s",
             "medium_timeout_s",
             "large_timeout_s",
+            "planner_max_tokens",
         }
         if key in int_keys:
             setattr(self, key, int(value))

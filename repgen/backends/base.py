@@ -2,12 +2,51 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Callable, Optional
+
+from .reasoning import ReasoningEffort
 
 logger = logging.getLogger("repgen.backends")
+
+# Callback for live output: (delta, kind) where kind is one of
+# "start" | "text" | "reasoning" | "usage" | "end". "start"/"end" bracket a
+# single call (delta is empty); "text"/"reasoning" carry incremental output;
+# "usage" carries a JSON-encoded token-usage dict emitted just before "end".
+StreamCallback = Optional[Callable[[str, str], None]]
+
+
+def normalize_usage(usage: dict) -> dict:
+    """Map any provider's token-usage dict to canonical keys.
+
+    Providers name their token counts differently — OpenAI uses
+    ``completion_tokens``/``reasoning_tokens``, Anthropic ``output_tokens`` (with
+    thinking folded in), Gemini ``candidatesTokenCount``/``thoughtsTokenCount``.
+    This flattens them to ``input_tokens``/``output_tokens``/``reasoning_tokens``/
+    ``total_tokens`` so the UI can show real numbers regardless of backend.
+    """
+    if not usage:
+        return {}
+
+    def pick(*keys):
+        for key in keys:
+            value = usage.get(key)
+            if value is not None:
+                return value
+        return None
+
+    canonical = {
+        "input_tokens": pick("prompt_tokens", "input_tokens", "promptTokenCount"),
+        "output_tokens": pick(
+            "completion_tokens", "output_tokens", "candidatesTokenCount"
+        ),
+        "reasoning_tokens": pick("reasoning_tokens", "thoughtsTokenCount"),
+        "total_tokens": pick("total_tokens", "totalTokenCount"),
+    }
+    return {k: v for k, v in canonical.items() if v is not None}
 
 
 @dataclass
@@ -35,9 +74,57 @@ class LLMBackend(ABC):
     default_model: str = ""
     suggested_models: tuple[str, ...] = ()
 
-    def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        effort: "ReasoningEffort | str | None" = None,
+    ):
         self.model = model or self.default_model
         self.api_key = api_key
+        # The user's chosen reasoning tier drives the native reasoning level and
+        # the default token ceiling for every call (see :mod:`.reasoning`).
+        self.effort = ReasoningEffort.coerce(effort)
+        # When set (by the CLI), backends stream output live to this callback.
+        # Left None everywhere else so the non-streaming path is unchanged.
+        self.on_stream: StreamCallback = None
+
+    def _emit(self, delta: str, kind: str = "text") -> None:
+        """Push a streaming delta to the renderer, if one is attached."""
+        cb = self.on_stream
+        if cb is None:
+            return
+        try:
+            cb(delta, kind)
+        except Exception:  # noqa: BLE001 - rendering must never break a run
+            pass
+
+    def _emit_usage(self, usage: dict) -> None:
+        """Emit the call's token usage to the renderer just before ``end``.
+
+        Sent as a JSON string under the ``usage`` kind so the live renderer can
+        show the *real* output/reasoning token counts (reasoning models rarely
+        stream their thinking, so a char-based estimate reads as ~0).
+        """
+        if not usage or self.on_stream is None:
+            return
+        try:
+            self._emit(json.dumps(normalize_usage(usage)), "usage")
+        except Exception:  # noqa: BLE001 - usage reporting is best-effort
+            pass
+
+    @property
+    def streaming(self) -> bool:
+        return self.on_stream is not None
+
+    def resolve_max_tokens(self, requested: Optional[int]) -> int:
+        """Resolve the effective ``max_tokens`` for a call.
+
+        ``None`` means "use whatever the user's reasoning tier allows" — this is
+        the default so token limits are the user's decision (via the effort
+        control), not a magic constant buried in a call site.
+        """
+        return requested if requested is not None else self.effort.max_tokens
 
     @abstractmethod
     def generate(
@@ -46,9 +133,12 @@ class LLMBackend(ABC):
         *,
         system: Optional[str] = None,
         temperature: float = 0.0,
-        max_tokens: int = 4096,
+        max_tokens: Optional[int] = None,
     ) -> LLMResponse:
-        """Generate a completion for ``prompt`` and return an :class:`LLMResponse`."""
+        """Generate a completion for ``prompt`` and return an :class:`LLMResponse`.
+
+        ``max_tokens=None`` inherits the ceiling from the user's reasoning tier.
+        """
 
     def is_configured(self) -> bool:
         """Whether the backend has everything it needs to run (key/endpoint)."""

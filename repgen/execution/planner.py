@@ -102,9 +102,15 @@ class ExecutionPlanner:
         self,
         backend: Optional[LLMBackend] = None,
         thresholds: Optional[ComplexityThresholds] = None,
+        *,
+        max_tokens: int = 4096,
     ):
         self.backend = backend
         self.thresholds = thresholds or ComplexityThresholds()
+        # User-configured token budget for the planning call. Reasoning models
+        # spend it on internal reasoning too, so too small a value starves the
+        # JSON answer and silently forces the heuristic fallback.
+        self.max_tokens = max_tokens
 
     def plan(
         self,
@@ -145,7 +151,7 @@ class ExecutionPlanner:
                     hardware.render(),
                     bug_report,
                 ),
-                max_tokens=600,
+                max_tokens=self.max_tokens,
             ).text
         except Exception as e:  # noqa: BLE001
             logger.warning("Planner LLM call failed: %s", e)

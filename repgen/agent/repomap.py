@@ -20,9 +20,44 @@ from typing import Dict, List, Optional, Tuple
 _SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", ".mypy_cache"}
 
 
+_WORD_RE = re.compile(r"\w+")
+# Splits an identifier into its camelCase / PascalCase / digit components.
+# e.g. "RotaryEmbedding" -> ["Rotary", "Embedding"], "apply2d" -> ["apply", "2"].
+_CAMEL_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
+
+
+def _subtokens(word: str) -> List[str]:
+    """Break an identifier into lowercased camelCase / snake_case parts."""
+    return [m.group(0).lower() for m in _CAMEL_RE.finditer(word)]
+
+
 def tokenize(text: str) -> List[str]:
-    """Basic identifier-aware tokenizer used for BM25 and matching."""
-    return re.findall(r"\b\w+[\w\d_]*\b", text.lower())
+    """Identifier-aware tokenizer used for BM25 and matching.
+
+    Emits both the whole lowercased identifier *and* its sub-components so that
+    a query like ``rotary`` or ``apply_rotary_pos_emb`` matches a symbol named
+    ``RotaryEmbedding`` (and vice versa). Code search lives or dies on this:
+    without it, ``TransformerWrapper`` is a single opaque token that only an
+    exact-spelling query can ever hit.
+    """
+    tokens: List[str] = []
+    for raw in _WORD_RE.findall(text):
+        low = raw.lower()
+        tokens.append(low)
+        parts = _subtokens(raw)
+        if len(parts) > 1:  # only add parts when they differ from the whole
+            tokens.extend(parts)
+    return tokens
+
+
+def index_tokens(rel: str, name: str, text: str) -> List[str]:
+    """Tokens for one indexed chunk, weighting the symbol name and path.
+
+    A hit on the symbol's *name* is far more relevant than an incidental hit in
+    the body, so we repeat name/path tokens to lift their term frequency —
+    cheap field weighting without leaving pure-Python BM25.
+    """
+    return tokenize(name) * 3 + tokenize(rel) * 2 + tokenize(text)
 
 
 # ==========================================================================
@@ -33,7 +68,7 @@ def tokenize(text: str) -> List[str]:
 class BM25:
     """Okapi BM25 over a fixed corpus of pre-tokenized documents."""
 
-    def __init__(self, corpus: List[List[str]], k1: float = 1.5, b: float = 0.75):
+    def __init__(self, corpus: List[List[str]], k1: float = 1.5, b: float = 0.5):
         self.corpus = corpus
         self.k1 = k1
         self.b = b
@@ -195,7 +230,7 @@ class RepoMap:
                 # Index the whole file so scripts/configs are still searchable.
                 chunk = Chunk(rel, rel, 1, len(source.splitlines()), source)
                 self.chunks.append(chunk)
-                corpus.append(tokenize(f"{rel} {source}"))
+                corpus.append(index_tokens(rel, rel, source))
 
         self._bm25 = BM25(corpus)
         self._built = True
@@ -213,7 +248,7 @@ class RepoMap:
             text=text,
         )
         self.chunks.append(chunk)
-        corpus.append(tokenize(f"{rel} {node.name} {text}"))
+        corpus.append(index_tokens(rel, node.name, text))
 
     # -- serving ----------------------------------------------------------
     def search(self, query: str, top_k: int = 8) -> List[Tuple[Chunk, float]]:

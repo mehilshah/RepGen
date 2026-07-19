@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 from typing import Optional
 
 import typer
@@ -12,15 +13,16 @@ from rich.prompt import IntPrompt, Prompt
 from rich.table import Table
 
 from . import __version__
-from .backends import BACKEND_NAMES, get_backend, list_backends
+from .backends import BACKEND_NAMES, ReasoningEffort, get_backend, list_backends
 from .backends.models import model_specs
+from .backends.validation import validate_model
 from .config import RepGenConfig, config_path
 from .console import configure_logging, console
 from .core import RepGenService
 from .execution.frameworks import FRAMEWORK_NAMES, get_framework, list_frameworks
 from .execution.pipeline import ExecutionSettings
 from .reporting import RunReporter
-from .ui import ExecutionReporter, interactive_confirm
+from .ui import ExecutionReporter, StreamRenderer, interactive_confirm
 
 app = typer.Typer(
     add_completion=True,
@@ -47,20 +49,40 @@ def _prompt_framework() -> str:
     return fws[choice - 1].name
 
 
+_LOGO = r"""
+██████╗  ███████╗ ██████╗   ██████╗  ███████╗ ███╗   ██╗
+██╔══██╗ ██╔════╝ ██╔══██╗ ██╔════╝  ██╔════╝ ████╗  ██║
+██████╔╝ █████╗   ██████╔╝ ██║  ███╗ █████╗   ██╔██╗ ██║
+██╔══██╗ ██╔══╝   ██╔═══╝  ██║   ██║ ██╔══╝   ██║╚██╗██║
+██║  ██║ ███████╗ ██║      ╚██████╔╝ ███████╗ ██║ ╚████║
+╚═╝  ╚═╝ ╚══════╝ ╚═╝       ╚═════╝  ╚══════╝ ╚═╝  ╚═══╝
+"""
+
+
 def _banner() -> None:
-    console.print(
-        Panel(
-            "[bold white]RepGen[/bold white] — automated bug reproduction\n"
-            "[dim]explore · generate · verify (no code execution)[/dim]",
-            border_style="bold blue",
-            subtitle=f"[dim]v{__version__}[/dim]",
-            expand=False,
-            padding=(1, 2),
+    console.print(f"[bold blue]{_LOGO}[/bold blue]", highlight=False)
+    console.print(f"[dim]v{__version__}[/dim]\n")
+
+
+def _prompt_effort(default: str = "medium") -> str:
+    console.print("\n[bold]How hard should the model think?[/bold]")
+    tiers = list(ReasoningEffort)
+    default_tier = ReasoningEffort.coerce(default)
+    for i, tier in enumerate(tiers, 1):
+        marker = " [cyan](default)[/cyan]" if tier is default_tier else ""
+        console.print(
+            f"  {i}) {tier.value} — {tier.label}: {tier.description}{marker}"
         )
+    choice = IntPrompt.ask(
+        "Choice",
+        choices=[str(i) for i in range(1, len(tiers) + 1)],
+        show_choices=False,
+        default=tiers.index(default_tier) + 1,
     )
+    return tiers[choice - 1].value
 
 
-def _prompt_backend() -> str:
+def _prompt_backend(default: Optional[str] = None) -> str:
     console.print("\n[bold]Select an LLM backend:[/bold]")
     for i, name in enumerate(BACKEND_NAMES, 1):
         client = get_backend(name)
@@ -69,11 +91,16 @@ def _prompt_backend() -> str:
             if client.is_configured()
             else "[dim]needs key[/dim]"
         )
-        console.print(f"  {i}) {name}  {state}")
+        marker = " [cyan](default)[/cyan]" if name == default else ""
+        console.print(f"  {i}) {name}  {state}{marker}")
+    default_idx = (
+        BACKEND_NAMES.index(default) + 1 if default in BACKEND_NAMES else None
+    )
     choice = IntPrompt.ask(
         "Choice",
         choices=[str(i) for i in range(1, len(BACKEND_NAMES) + 1)],
         show_choices=False,
+        default=default_idx,
     )
     return BACKEND_NAMES[choice - 1]
 
@@ -81,11 +108,74 @@ def _prompt_backend() -> str:
 def _prompt_model(backend: str) -> str:
     client = get_backend(backend)
     models = client.list_models()
-    if not models:
-        return Prompt.ask(f"Model for {backend}", default=client.default_model)
-    return Prompt.ask(
-        f"Model for {backend}", choices=models, default=client.default_model
-    )
+    if models:
+        console.print(f"\n[bold]Suggested models for {backend}:[/bold]")
+        for m in models:
+            marker = " [cyan](default)[/cyan]" if m == client.default_model else ""
+            console.print(f"  • {m}{marker}")
+        console.print(
+            "[dim]Pick one of the above, or type any other valid model ID.[/dim]"
+        )
+    default = client.default_model or None
+    while True:
+        model = (Prompt.ask(f"Model for {backend}", default=default) or "").strip()
+        # A model ID is a single, non-empty token.
+        if not model or any(c.isspace() for c in model):
+            console.print(
+                "[error]That doesn't look like a valid model ID. "
+                "Please enter a valid model ID.[/error]"
+            )
+            continue
+        # Known suggestion — accept immediately.
+        if model in models:
+            return model
+        # Off-catalog: cross-check the ID against OpenRouter's public model list.
+        console.print(f"[dim]Checking '{model}' against OpenRouter...[/dim]")
+        is_valid, reason = validate_model(backend, model)
+        if is_valid is True:
+            console.print(f"[green]'{model}' verified via OpenRouter.[/green]")
+            return model
+        if is_valid is None:
+            # Couldn't verify (backend not on OpenRouter, or lookup failed) —
+            # don't block the user, but warn them.
+            console.print(
+                f"[yellow]Couldn't verify '{model}' ({reason}); using it as a "
+                "custom model ID — make sure it's valid.[/yellow]"
+            )
+            return model
+        console.print(
+            f"[error]'{model}' is not a valid model ID for {backend} "
+            "(not found on OpenRouter). Please enter a valid model ID.[/error]"
+        )
+
+
+def _prompt_source() -> str:
+    """Ask whether the bug comes from a GitHub issue or a local source.
+
+    Returns a bug-report *source* the pipeline can consume: a GitHub issue URL,
+    a path to a bug-report file, or — when the user types a description inline —
+    a path to a temp file holding that description.
+    """
+    console.print("\n[bold]Where is the bug reported?[/bold]")
+    console.print("  1) GitHub issue (URL)")
+    console.print("  2) Local (bug description or bug-report file)")
+    choice = IntPrompt.ask("Choice", choices=["1", "2"], show_choices=False, default=1)
+    if choice == 1:
+        return Prompt.ask("[cyan]GitHub issue URL[/cyan]")
+
+    console.print("\n[bold]How do you want to provide the local bug?[/bold]")
+    console.print("  1) Type a bug description")
+    console.print("  2) Path to a bug-report file")
+    how = IntPrompt.ask("Choice", choices=["1", "2"], show_choices=False, default=1)
+    if how == 2:
+        return Prompt.ask("[cyan]Path to bug report[/cyan]")
+
+    description = Prompt.ask("[cyan]Bug description[/cyan]")
+    fd, path = tempfile.mkstemp(prefix="repgen_bug_", suffix=".txt", text=True)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(description)
+    console.print(f"[dim]Saved bug description to {path}[/dim]")
+    return path
 
 
 def _ensure_api_key(backend: str) -> None:
@@ -112,6 +202,11 @@ def run(
         None, "--backend", help=f"LLM backend ({', '.join(BACKEND_NAMES)})."
     ),
     model: Optional[str] = typer.Option(None, "--model", help="Model name."),
+    reasoning_effort: Optional[str] = typer.Option(
+        None, "--reasoning-effort", "-e",
+        help="How hard to think: low | medium | high (sizes reasoning + token "
+        "limits for every operation).",
+    ),
     commit: Optional[str] = typer.Option(
         None, "--commit", help="Git commit to checkout."
     ),
@@ -149,7 +244,6 @@ def run(
         configure_logging("INFO")
     cfg = RepGenConfig.load()
 
-    backend = backend or cfg.backend
     output = output or cfg.output_dir
     max_attempts = max_attempts or cfg.max_attempts
     max_explore_steps = max_explore_steps or cfg.max_explore_steps
@@ -159,42 +253,61 @@ def run(
         cfg.max_exec_retries if max_exec_retries is None else max_exec_retries
     )
 
-    if framework not in FRAMEWORK_NAMES:
-        if yes:
-            console.print(f"[error]Unknown framework '{framework}'.[/error]")
-            raise typer.Exit(1)
-        framework = _prompt_framework()
-
-    if not bug_report:
-        if yes:
-            console.print(
-                "[error]--bug-report is required in non-interactive mode.[/error]"
-            )
-            raise typer.Exit(1)
-        bug_report = Prompt.ask("[cyan]Bug report (path or URL)[/cyan]")
-    if not repo:
-        if yes:
-            console.print("[error]--repo is required in non-interactive mode.[/error]")
-            raise typer.Exit(1)
-        repo = Prompt.ask("[cyan]Repository (path or URL)[/cyan]")
-
+    # 1. Which model backend to use (OpenAI / Claude / Gemini / Ollama / OpenRouter).
+    # Always ask interactively (offering the config value as the default) unless a
+    # backend was passed via --backend or we're running non-interactively.
+    if backend is None:
+        backend = cfg.backend if yes else _prompt_backend(default=cfg.backend)
     if backend not in BACKEND_NAMES:
         if yes:
             console.print(f"[error]Unknown backend '{backend}'.[/error]")
             raise typer.Exit(1)
-        backend = _prompt_backend()
+        backend = _prompt_backend(default=cfg.backend)
+
+    # 2. Model + API key for the chosen backend.
     if not model:
         model = cfg.model or (None if yes else _prompt_model(backend))
     if not yes:
         _ensure_api_key(backend)
 
-    client = get_backend(backend, model)
+    # 2b. Reasoning effort — sizes the native reasoning level and the token
+    # ceiling for every operation. CLI flag > config > interactive prompt.
+    if reasoning_effort is None:
+        reasoning_effort = (
+            cfg.reasoning_effort if yes else _prompt_effort(default=cfg.reasoning_effort)
+        )
+    reasoning_effort = ReasoningEffort.coerce(reasoning_effort).value
+
+    client = get_backend(backend, model, effort=reasoning_effort)
     if not client.is_configured():
         console.print(
             f"[error]Backend '{backend}' is not configured "
             f"(set {client.env_key}).[/error]"
         )
         raise typer.Exit(1)
+
+    # 3. Where the bug is reported: a GitHub issue, or local (description / file).
+    if not bug_report:
+        if yes:
+            console.print(
+                "[error]--bug-report is required in non-interactive mode.[/error]"
+            )
+            raise typer.Exit(1)
+        bug_report = _prompt_source()
+
+    # 4. The codebase to reproduce the bug against.
+    if not repo:
+        if yes:
+            console.print("[error]--repo is required in non-interactive mode.[/error]")
+            raise typer.Exit(1)
+        repo = Prompt.ask("[cyan]Codebase path (or URL)[/cyan]")
+
+    # 5. Target framework (defaults from config; only prompts if invalid).
+    if framework not in FRAMEWORK_NAMES:
+        if yes:
+            console.print(f"[error]Unknown framework '{framework}'.[/error]")
+            raise typer.Exit(1)
+        framework = _prompt_framework()
 
     reporter = RunReporter(verbose=verbose)
     exec_reporter = ExecutionReporter(verbose=verbose)
@@ -204,6 +317,7 @@ def run(
         quick_timeout_s=cfg.quick_timeout_s,
         medium_timeout_s=cfg.medium_timeout_s,
         large_timeout_s=cfg.large_timeout_s,
+        planner_max_tokens=cfg.planner_max_tokens,
     )
     service = RepGenService(output_dir=output)
     result = service.run_reproduction(
@@ -214,6 +328,13 @@ def run(
         commit=commit,
         max_attempts=max_attempts,
         max_explore_steps=max_explore_steps,
+        reasoning_effort=reasoning_effort,
+        # Live token streaming only makes sense on an interactive terminal.
+        stream_callback=(
+            StreamRenderer(verbose=verbose)
+            if (not yes and sys.stdout.isatty())
+            else None
+        ),
         progress_callback=reporter,
         execute=execute,
         framework=framework,

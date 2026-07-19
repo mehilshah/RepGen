@@ -53,7 +53,7 @@ class ReproductionGenerator:
 
     def _make_plan(self, refined_report: str, context: RetrievedContext) -> str:
         raw = self.backend.generate(
-            plan_prompt(refined_report, context.as_prompt_text()), max_tokens=1500
+            plan_prompt(refined_report, context.as_prompt_text())
         ).text
         plan = extract_json_content(raw) or raw
         try:  # normalize to a readable bullet list if it is a JSON array
@@ -85,6 +85,9 @@ class ReproductionGenerator:
         for attempt_no in range(1, max_attempts + 1):
             self._notify("attempt_start", attempt=attempt_no, total=max_attempts)
 
+            # No fixed output cap: generation inherits the user's effort tier so
+            # a reasoning model isn't starved of output tokens by its own
+            # thinking (the cause of empty, "vacuously verified" scripts).
             raw_code = self.backend.generate(
                 code_prompt(
                     refined_report,
@@ -92,7 +95,6 @@ class ReproductionGenerator:
                     plan,
                     feedback=feedback_text,
                 ),
-                max_tokens=4096,
             ).text
             code = extract_json_content(raw_code) or raw_code
 

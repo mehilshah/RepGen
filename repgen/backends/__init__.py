@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .base import LLMBackend, LLMResponse
+from .reasoning import ReasoningEffort
 from .claude import ClaudeBackend
 from .gemini import GeminiBackend
 from .openai_backend import (
@@ -31,7 +32,10 @@ BACKEND_NAMES = list(BACKENDS.keys())
 
 
 def get_backend(
-    name: str, model: Optional[str] = None, api_key: Optional[str] = None
+    name: str,
+    model: Optional[str] = None,
+    api_key: Optional[str] = None,
+    effort: "ReasoningEffort | str | None" = None,
 ) -> LLMBackend:
     """Instantiate a backend by name.
 
@@ -43,7 +47,7 @@ def get_backend(
         raise ValueError(
             f"Unknown backend '{name}'. Choose from: {', '.join(BACKEND_NAMES)}"
         ) from None
-    return cls(model=model, api_key=api_key)
+    return cls(model=model, api_key=api_key, effort=effort)
 
 
 def list_backends() -> list[LLMBackend]:
@@ -54,6 +58,7 @@ def list_backends() -> list[LLMBackend]:
 __all__ = [
     "LLMBackend",
     "LLMResponse",
+    "ReasoningEffort",
     "BACKENDS",
     "BACKEND_NAMES",
     "get_backend",

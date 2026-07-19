@@ -52,6 +52,9 @@ class PreparedEnvironment:
     pip: Path  # path to the venv's pip executable
     created: bool = False  # False when we reused an existing venv
     system_site_packages: bool = False
+    # Set when the library under test could not be pip-installed (no packaging
+    # metadata) and must instead be importable via PYTHONPATH at run time.
+    extra_pythonpath: Optional[str] = None
 
     def setup_command(self) -> List[str]:
         """The command that (re)creates this venv."""
@@ -126,7 +129,10 @@ class EnvironmentManager:
         system_site_packages: bool = False,
         upgrade_pip: bool = False,
     ):
-        self.base_dir = Path(base_dir)
+        # Resolve to an absolute path so the venv's python/pip work regardless
+        # of the subprocess cwd (pip install runs from the process cwd; the
+        # generated script runs with cwd set to the run directory).
+        self.base_dir = Path(base_dir).resolve()
         self.system_site_packages = system_site_packages
         self.upgrade_pip = upgrade_pip
 
@@ -200,6 +206,50 @@ class EnvironmentManager:
         return InstallResult(
             success=completed.returncode == 0,
             requirements=requirements,
+            command=cmd,
+            output=completed.stdout,
+            returncode=completed.returncode,
+        )
+
+    def install_project(
+        self,
+        env: PreparedEnvironment,
+        project_dir: Path,
+        on_line: LineCallback = None,
+        editable: bool = True,
+        timeout: Optional[int] = 1800,
+    ) -> InstallResult:
+        """Install the target project (the library under test) into ``env``.
+
+        Installs from ``project_dir`` — which the caller has already checked out
+        to the commit/date where the bug reproduces — so the library under test
+        is present at that exact version and its declared dependencies resolve
+        to matching versions. An editable install (``-e``) is used by default so
+        the on-disk source is what runs.
+        """
+        cmd = [str(env.pip), "install"]
+        if editable:
+            cmd.append("-e")
+        cmd.append(str(project_dir))
+        if on_line:
+            on_line("$ " + " ".join(cmd), "stdout")
+        try:
+            completed = _stream_subprocess(
+                cmd, cwd=None, on_line=on_line, timeout=timeout
+            )
+        except subprocess.TimeoutExpired:
+            return InstallResult(
+                success=False,
+                command=cmd,
+                output="project install timed out",
+                returncode=124,
+            )
+        except FileNotFoundError as e:
+            return InstallResult(
+                success=False, command=cmd, output=str(e), returncode=127
+            )
+        return InstallResult(
+            success=completed.returncode == 0,
             command=cmd,
             output=completed.stdout,
             returncode=completed.returncode,

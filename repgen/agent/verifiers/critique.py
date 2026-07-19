@@ -22,7 +22,7 @@ class CritiqueVerifier(Verifier):
             return Feedback(stage=self.stage, passed=True, severity="info")
 
         raw = backend.generate(
-            critique_prompt(ctx.refined_report, code), max_tokens=1024
+            critique_prompt(ctx.refined_report, code)
         ).text
         payload = self._parse(raw)
         if payload is None:

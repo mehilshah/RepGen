@@ -166,6 +166,20 @@ runs — the detected `requirements.txt` and the isolated `.venv/`.
 
 See the [documentation](docs/index.md) for the full architecture.
 
+## GitHub integration
+
+RepGen ships a GitHub Action that reproduces bugs straight from your issue
+tracker: label an issue **`needs-repro`** and RepGen generates a reproduction
+script and posts it back as a comment on that issue.
+
+```
+issue labeled `needs-repro` ─► RepGen (Action) ─► comment with reproduction + report
+```
+
+The workflow lives at [`.github/workflows/repgen-repro.yml`](.github/workflows/repgen-repro.yml).
+See [docs/github-action.md](docs/github-action.md) for one-time setup (add your
+LLM key as a repo secret, create the label) and customization.
+
 ## Contributing
 
 ```bash

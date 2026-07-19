@@ -43,6 +43,8 @@ class RepGenService:
         max_attempts: int = 3,
         max_explore_steps: int = 12,
         api_key: Optional[str] = None,
+        reasoning_effort: Optional[str] = None,
+        stream_callback: Optional[Any] = None,
         progress_callback: ProgressCb = None,
         execute: bool = False,
         framework: Optional[str] = None,
@@ -65,7 +67,10 @@ class RepGenService:
                 progress_callback(event, data)
 
         try:
-            client = get_backend(backend, model, api_key)
+            client = get_backend(backend, model, api_key, effort=reasoning_effort)
+            # Attach the live-streaming renderer (if any) so every LLM call —
+            # refine, explore, generate, execute — streams to the terminal.
+            client.on_stream = stream_callback
 
             # 1. Inputs
             notify("setup", message="Fetching bug report and repository...")
@@ -92,9 +97,16 @@ class RepGenService:
             # 2. Refine bug report
             notify("refine", message="Refining bug report...")
             t0 = time.time()
-            refined = client.generate(
-                refinement_prompt(bug_report_content), max_tokens=1500
-            ).text
+            # Don't stream this step — only the refined result matters, and the
+            # live token feed here is noise. Temporarily detach the renderer.
+            _prev_stream = client.on_stream
+            client.on_stream = None
+            try:
+                refined = client.generate(
+                    refinement_prompt(bug_report_content)
+                ).text
+            finally:
+                client.on_stream = _prev_stream
             refined = refined or bug_report_content
             (run_dir / "refined_report.txt").write_text(refined)
             timings["refine"] = time.time() - t0
@@ -179,6 +191,7 @@ class RepGenService:
                     failure_signature=gen.failure_signature,
                     framework=framework,
                     local_modules=local_modules,
+                    repo_path=Path(local_repo_path),
                 )
                 timings["execute"] = time.time() - t0
                 result["execution"] = outcome

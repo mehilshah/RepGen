@@ -2,16 +2,21 @@
 
 :class:`ExecutionReporter` is a ``progress_callback`` for
 :class:`repgen.execution.pipeline.ExecutionPipeline`. It mirrors the event
-protocol the pipeline emits and renders each stage with a modern,
-AI-assistant-style layout:
+protocol the pipeline emits and renders each stage with a clean, milestone-first
+layout:
 
-* stage banners and a running phase indicator,
+* stage banners and milestone lines (deps, plan, decision, verdict),
 * the exact venv/pip/run commands (command visibility),
-* streamed program output (stdout normal, stderr highlighted),
-* collapsible logs — long install/exec output is capped by default and the tail
-  kept, with the full log always persisted to the run directory,
 * structured error/traceback panels and a bug-reproduction verdict,
 * a final execution summary table.
+
+Noisy detail — pip/venv chatter and the program's own stdout/stderr — is handled
+by verbosity:
+
+* **silent (default):** the detail is written to ``execution.log`` in the run
+  directory and kept out of the terminal; a one-line pointer is shown instead.
+* **verbose (``-v``):** the full detail is streamed inline as it happens (and
+  still saved to the log file).
 
 It never raises: rendering failures are swallowed so a display bug can't crash a
 run (matching :class:`repgen.reporting.RunReporter`).
@@ -19,7 +24,8 @@ run (matching :class:`repgen.reporting.RunReporter`).
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict, Optional, TextIO
 
 from rich.panel import Panel
 from rich.prompt import Prompt
@@ -30,8 +36,7 @@ from rich.text import Text
 
 from ..console import console
 
-# How many trailing output lines to show inline before collapsing.
-_MAX_INLINE_LINES = 40
+_LOG_FILENAME = "execution.log"
 
 
 class ExecutionReporter:
@@ -39,9 +44,10 @@ class ExecutionReporter:
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
-        self._exec_lines: Dict[int, List[tuple[str, str]]] = {}
-        self._install_lines: List[str] = []
         self._started = False
+        self._log_file: Optional[TextIO] = None
+        self._log_path: Optional[Path] = None
+        self._log_lines = 0
 
     # progress_callback signature: (event, data)
     def __call__(self, event: str, data: Dict[str, Any]) -> None:
@@ -55,6 +61,45 @@ class ExecutionReporter:
             return
         self._started = True
         console.print(Rule("[bold cyan]Execution[/bold cyan]", style="cyan"))
+
+    # -- detailed-log plumbing -------------------------------------------
+    def _open_log(self, run_dir: str) -> None:
+        """Open the detailed run log in the run directory (once)."""
+        if self._log_file is not None or not run_dir:
+            return
+        try:
+            path = Path(run_dir) / _LOG_FILENAME
+            self._log_file = open(path, "w", encoding="utf-8")
+            self._log_path = path
+            if not self.verbose:
+                console.print(
+                    f"  [dim]detailed output → {path} "
+                    f"(use -v to show it inline)[/dim]"
+                )
+        except Exception:  # noqa: BLE001 - logging is best-effort
+            self._log_file = None
+            self._log_path = None
+
+    def _detail(self, line: str, stream: str = "stdout") -> None:
+        """Record one detail line: to the log file always, inline if verbose."""
+        if self._log_file is not None:
+            try:
+                self._log_file.write(line + "\n")
+                self._log_file.flush()
+                self._log_lines += 1
+            except Exception:  # noqa: BLE001
+                pass
+        if self.verbose:
+            style = "yellow" if stream == "stderr" else "white"
+            console.print(Text("    " + line, style=style))
+
+    def _close_log(self) -> None:
+        if self._log_file is not None:
+            try:
+                self._log_file.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._log_file = None
 
     def _handle(self, event: str, data: Dict[str, Any]) -> None:  # noqa: C901
         if event == "hardware":
@@ -82,11 +127,42 @@ class ExecutionReporter:
             console.print(f"  [{style}]decision:[/] {decision}")
 
         elif event == "env_prepare_start":
+            self._open_log(data.get("run_dir", ""))
             console.print("  [cyan]▶ preparing virtual environment...[/cyan]")
 
         elif event == "env_line":
-            if self.verbose:
-                console.print(f"    [dim]{data.get('line', '')}[/dim]")
+            self._detail(data.get("line", ""), data.get("stream", "stdout"))
+
+        elif event == "repo_requirements_start":
+            console.print(
+                f"  [cyan]▶ installing repo requirements[/cyan] "
+                f"[dim]{data.get('file', '')}[/dim]"
+            )
+
+        elif event == "repo_requirements_done":
+            result = data.get("result")
+            if result is not None:
+                mark = "[green]✓[/green]" if result.success else "[yellow]·[/yellow]"
+                console.print(f"  {mark} repo requirements installed")
+
+        elif event == "project_install_start":
+            kind = "editable " if data.get("editable") else ""
+            console.print(
+                f"  [cyan]▶ installing library under test ({kind}source)[/cyan] "
+                f"[dim]{data.get('path', '')}[/dim]"
+            )
+
+        elif event == "project_install_done":
+            result = data.get("result")
+            if result is not None:
+                mark = "[green]✓[/green]" if result.success else "[yellow]·[/yellow]"
+                console.print(f"  {mark} library under test installed")
+
+        elif event == "project_on_path":
+            console.print(
+                f"  [cyan]library under test on PYTHONPATH[/cyan] "
+                f"[dim]{data.get('path', '')}[/dim]"
+            )
 
         elif event == "requirements_updated":
             added = data.get("added") or []
@@ -98,25 +174,21 @@ class ExecutionReporter:
 
         elif event == "install_start":
             reqs = data.get("requirements") or []
-            self._install_lines = []
             console.print(
                 f"  [cyan]▶ installing {len(reqs)} package(s):[/cyan] "
                 f"[dim]{', '.join(reqs)}[/dim]"
             )
 
         elif event == "install_line":
-            line = data.get("line", "")
-            self._install_lines.append(line)
-            if self.verbose:
-                console.print(f"    [dim]{line}[/dim]")
+            self._detail(data.get("line", ""), data.get("stream", "stdout"))
 
         elif event == "install_done":
             result = data.get("result")
             if result is not None:
                 mark = "[green]✓[/green]" if result.success else "[red]✗[/red]"
                 console.print(f"  {mark} dependencies installed")
-                if not result.success and not self.verbose:
-                    self._collapsed_log("pip install log", self._install_lines)
+                if not result.success:
+                    self._point_to_log("install output")
 
         elif event == "install_failed":
             console.print(f"  [red]✗ {data.get('message', 'install failed')}[/red]")
@@ -135,7 +207,6 @@ class ExecutionReporter:
         elif event == "exec_start":
             attempt = data.get("attempt", 1)
             total = data.get("total", 1)
-            self._exec_lines[attempt] = []
             cmd = " ".join(data.get("command", []))
             console.print(
                 f"\n  [bold green]▶ run[/bold green] "
@@ -144,14 +215,7 @@ class ExecutionReporter:
             console.print(f"    [code]$ {cmd}[/code]")
 
         elif event == "exec_line":
-            attempt = data.get("attempt", 1)
-            stream = data.get("stream", "stdout")
-            line = data.get("line", "")
-            self._exec_lines.setdefault(attempt, []).append((stream, line))
-            if stream == "stderr":
-                console.print(Text("    " + line, style="yellow"))
-            else:
-                console.print(Text("    " + line, style="white"))
+            self._detail(data.get("line", ""), data.get("stream", "stdout"))
 
         elif event == "exec_done":
             result = data.get("result")
@@ -177,6 +241,11 @@ class ExecutionReporter:
             console.print(f"  [red]✗ environment error: {data.get('message')}[/red]")
 
     # -- sub-renderers ----------------------------------------------------
+    def _point_to_log(self, what: str) -> None:
+        """In silent mode, point at the log file when something needs a look."""
+        if not self.verbose and self._log_path is not None:
+            console.print(f"    [dim]see {what} in {self._log_path}[/dim]")
+
     def _render_plan(self, plan) -> None:
         if plan is None:
             return
@@ -233,18 +302,10 @@ class ExecutionReporter:
         console.print(Panel("\n".join(body), title=title, border_style=style,
                             expand=False))
 
-    def _collapsed_log(self, title: str, lines: List[str]) -> None:
-        tail = lines[-_MAX_INLINE_LINES:]
-        hidden = len(lines) - len(tail)
-        header = f"{title} (last {len(tail)} of {len(lines)} lines)" if hidden else title
-        console.print(
-            Panel("\n".join(tail), title=f"[dim]{header}[/dim]",
-                  border_style="dim", expand=False)
-        )
-
     # -- final summary ----------------------------------------------------
     def summary(self, outcome) -> None:
         """Render the final execution summary table."""
+        self._close_log()
         try:
             self._summary(outcome)
         except Exception:  # noqa: BLE001
@@ -270,6 +331,8 @@ class ExecutionReporter:
             table.add_row("Reproduced", "yes" if outcome.reproduced else "no")
         if outcome.error:
             table.add_row("Error", outcome.error)
+        if self._log_path is not None and self._log_lines:
+            table.add_row("Detailed log", str(self._log_path))
         console.print(table)
 
 

@@ -7,8 +7,16 @@ A static AST "abstract interpreter" that reasons about the generated script
    actually name a symbol that exists in repo module ``M``?).
 2. Name binding (undefined-name / no obvious definition), builtins-aware.
 3. Call signatures against retrieved definitions (arity + keyword validity).
-4. Failure-path reachability: the reported failing API is actually invoked and an
-   observation point (assert/print/try-except) is present to surface the bug.
+4. Failure-path *hints* (non-blocking): whether the reported failing behaviour
+   looks exercised at all, and whether an observation point (assert/print/
+   try-except) is present to surface the bug.
+
+Note on (4): a bug is rarely triggered by literally calling one named command —
+it surfaces through attribute access, operators, context managers, indirect
+dispatch, or a whole chain of ordinary calls. So the failure-path stage never
+*blocks* a run and never tells the model to "call API X"; it only emits a soft
+warning when the reported operation is nowhere in the script's referenced
+surface, leaving the LLM to reason about the (deeper) real trigger.
 """
 
 from __future__ import annotations
@@ -301,24 +309,27 @@ class SymbolicVerifier(Verifier):
         if sig.is_empty():
             return findings
 
-        called_names = set()
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                f = node.func
-                if isinstance(f, ast.Name):
-                    called_names.add(f.id)
-                elif isinstance(f, ast.Attribute):
-                    called_names.add(f.attr)
+        # Look at the whole *referenced* surface — every name/attribute/keyword
+        # the script mentions — not just direct call targets. The reported bug
+        # may be reached indirectly (operators, context managers, dispatch, a
+        # chain of calls), so a name appearing anywhere counts as "exercised".
+        referenced = self._referenced_symbols(tree)
 
         if sig.trigger_apis:
-            if not any(api in called_names for api in sig.trigger_apis):
+            # Match on the final dotted segment (``a.b.load`` → ``load``); a hit
+            # anywhere in the referenced surface is enough.
+            wanted = {api.split(".")[-1] for api in sig.trigger_apis if api}
+            if wanted and not (wanted & referenced):
                 findings.append(
                     Finding(
                         message=(
-                            "reproduction never invokes the failing operation(s): "
-                            f"{sig.trigger_apis}"
+                            "the reproduction may not exercise the reported failing "
+                            f"behaviour (found no reference to {sorted(wanted)}); "
+                            "make sure the buggy code path is actually reached"
                         ),
-                        suggestion="Call the API named in the bug report so the bug can manifest.",
+                        # Warning only: never block, and never prescribe a
+                        # specific command to call — the real trigger is deeper.
+                        suggestion="__warning__",
                     )
                 )
 
@@ -340,6 +351,24 @@ class SymbolicVerifier(Verifier):
                 )
             )
         return findings
+
+    @staticmethod
+    def _referenced_symbols(tree: ast.AST) -> set:
+        """Every identifier the script mentions: names, attributes, keywords.
+
+        Broad on purpose — the failing operation may be reached without a direct
+        call to a matching name (e.g. via an attribute, an operator overload, or
+        a keyword argument), so we treat any mention as "exercised".
+        """
+        names: set = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name):
+                names.add(node.id)
+            elif isinstance(node, ast.Attribute):
+                names.add(node.attr)
+            elif isinstance(node, ast.keyword) and node.arg:
+                names.add(node.arg)
+        return names
 
     @staticmethod
     def _suggest(name: str, candidates) -> Optional[str]:

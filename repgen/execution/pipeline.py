@@ -67,6 +67,7 @@ class ExecutionSettings:
     auto_execute_quick: bool = True
     system_site_packages: bool = False
     reproduced_threshold: float = 0.5
+    planner_max_tokens: int = 4096  # LLM budget for complexity planning
     thresholds: ComplexityThresholds = field(default_factory=ComplexityThresholds)
 
     def timeout_for(self, complexity: Complexity, plan_minutes: float) -> int:
@@ -131,7 +132,11 @@ class ExecutionPipeline:
         self.settings = settings or ExecutionSettings()
         self.progress_cb = progress_cb
         self.confirm_cb = confirm_cb
-        self.planner = ExecutionPlanner(backend, self.settings.thresholds)
+        self.planner = ExecutionPlanner(
+            backend,
+            self.settings.thresholds,
+            max_tokens=self.settings.planner_max_tokens,
+        )
         self.analyzer = ReproductionAnalyzer(
             backend, self.settings.reproduced_threshold
         )
@@ -151,6 +156,7 @@ class ExecutionPipeline:
         failure_signature: Optional[FailureSignature] = None,
         framework: Optional[str] = None,
         local_modules: Optional[List[str]] = None,
+        repo_path: Optional[Path] = None,
         hardware: Optional[HardwareInfo] = None,
         script_name: str = "reproduce.py",
     ) -> ExecutionOutcome:
@@ -159,6 +165,13 @@ class ExecutionPipeline:
         if not self.settings.enabled:
             outcome.error = "Execution disabled."
             return outcome
+
+        # Resolve to an absolute path up front. Every derived path (the venv's
+        # python/pip and the script) must be cwd-independent: pip install runs
+        # from the process cwd while the script runs with ``cwd=run_dir``, so a
+        # relative run_dir would be re-resolved against itself at run time and
+        # produce a bogus, non-existent interpreter path (FileNotFoundError 127).
+        run_dir = Path(run_dir).resolve()
 
         fw = get_framework(framework)
         hw = hardware or detect_hardware(str(run_dir))
@@ -187,7 +200,8 @@ class ExecutionPipeline:
 
         # 3. Prepare environment + install deps.
         run_dir.mkdir(parents=True, exist_ok=True)
-        env = self._prepare_environment(run_dir, deps, resolver, fw)
+        repo = Path(repo_path).resolve() if repo_path else None
+        env = self._prepare_environment(run_dir, deps, resolver, fw, repo)
         outcome.environment = env
         if env is None:
             outcome.error = "Failed to prepare environment."
@@ -234,6 +248,7 @@ class ExecutionPipeline:
         deps: DependencyReport,
         resolver: DependencyResolver,
         fw: Framework,
+        repo_path: Optional[Path] = None,
     ) -> Optional[PreparedEnvironment]:
         self._notify("env_prepare_start", run_dir=str(run_dir))
         manager = EnvironmentManager(
@@ -250,19 +265,28 @@ class ExecutionPipeline:
             self._notify("env_error", message=str(e))
             return None
 
-        # Persist detected + framework deps into requirements.txt.
+        install_line = lambda line, stream: self._notify(  # noqa: E731
+            "install_line", line=line, stream=stream
+        )
+
+        # 3a. Install the library under test from its checked-out source first,
+        # so its declared dependencies pin the versions where the bug reproduces
+        # and later detected extras don't upgrade them.
+        if repo_path is not None:
+            self._install_project(manager, env, repo_path, install_line)
+
+        # 3b. Persist detected + framework deps into requirements.txt.
         req_path = run_dir / "requirements.txt"
         added = resolver.update_requirements(req_path, deps.requirements)
         self._notify("requirements_updated", path=str(req_path), added=added)
 
+        # 3c. Install the statically-detected third-party extras. pip leaves
+        # already-satisfied (repo-pinned) packages untouched — no --upgrade — so
+        # this only fills gaps the repo install didn't cover.
         if deps.requirements:
             self._notify("install_start", requirements=deps.requirements)
             result = manager.install(
-                env,
-                deps.requirements,
-                on_line=lambda line, stream: self._notify(
-                    "install_line", line=line, stream=stream
-                ),
+                env, deps.requirements, on_line=install_line
             )
             self._notify("install_done", result=result)
             if not result.success:
@@ -271,6 +295,45 @@ class ExecutionPipeline:
                     message="Dependency installation failed; execution may error.",
                 )
         return env
+
+    def _install_project(
+        self,
+        manager: EnvironmentManager,
+        env: PreparedEnvironment,
+        repo_path: Path,
+        on_line: Callable[[str, str], None],
+    ) -> None:
+        """Install the target repo (and its own requirement pins) into ``env``.
+
+        Prefers an editable install when the repo carries packaging metadata; if
+        it does not, the repo is put on ``PYTHONPATH`` at run time instead so the
+        library still imports. Either way the version matches the checked-out
+        bug commit.
+        """
+        # Install the repo's own pinned requirements first (matching versions).
+        for name in ("requirements.txt", "requirements-dev.txt"):
+            req_file = repo_path / name
+            if req_file.exists():
+                self._notify("repo_requirements_start", file=str(req_file))
+                result = manager.install_requirements_file(
+                    env, req_file, on_line=on_line
+                )
+                self._notify("repo_requirements_done", result=result, file=str(req_file))
+
+        if _is_packaged(repo_path):
+            self._notify("project_install_start", path=str(repo_path), editable=True)
+            result = manager.install_project(
+                env, repo_path, on_line=on_line, editable=True
+            )
+            self._notify("project_install_done", result=result)
+            if result.success:
+                return
+            # Editable install failed (build error, exotic layout): fall back to
+            # PYTHONPATH so imports still resolve against the source tree.
+            logger.warning("Editable install of %s failed; using PYTHONPATH.", repo_path)
+
+        env.extra_pythonpath = str(repo_path)
+        self._notify("project_on_path", path=str(repo_path))
 
     def _write_commands(
         self,
@@ -312,6 +375,11 @@ class ExecutionPipeline:
     ) -> None:
         runner = CodeRunner(env.python)
         timeout = self.settings.timeout_for(plan.complexity, plan.estimated_minutes)
+        # When the repo couldn't be pip-installed, make it importable via
+        # PYTHONPATH so ``import <library under test>`` resolves at run time.
+        run_env = (
+            {"PYTHONPATH": env.extra_pythonpath} if env.extra_pythonpath else None
+        )
         current = code
 
         total = self.settings.max_retries + 1
@@ -330,6 +398,7 @@ class ExecutionPipeline:
                 script_path,
                 cwd=run_dir,
                 timeout=timeout,
+                env=run_env,
                 on_line=lambda line, stream: self._notify(
                     "exec_line", line=line, stream=stream, attempt=attempt_no
                 ),
@@ -387,7 +456,6 @@ class ExecutionPipeline:
                     result.traceback,
                     goal,
                 ),
-                max_tokens=4096,
             ).text
         except Exception as e:  # noqa: BLE001
             logger.warning("refine LLM call failed: %s", e)
@@ -400,6 +468,14 @@ class ExecutionPipeline:
                 break
         refined = extract_json_content(raw)
         return refined, cause
+
+
+def _is_packaged(repo_path: Path) -> bool:
+    """Whether ``repo_path`` carries packaging metadata pip can install from."""
+    return any(
+        (repo_path / marker).exists()
+        for marker in ("pyproject.toml", "setup.py", "setup.cfg")
+    )
 
 
 def _merge(base: List[str], extra: List[str]) -> List[str]:

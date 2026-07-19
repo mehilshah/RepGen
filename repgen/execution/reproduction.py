@@ -190,7 +190,6 @@ class ReproductionAnalyzer:
                     result.exception_type,
                     result.traceback,
                 ),
-                max_tokens=800,
             ).text
         except Exception as e:  # noqa: BLE001
             logger.warning("Reproduction LLM call failed: %s", e)

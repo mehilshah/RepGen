@@ -42,7 +42,28 @@ class RunReporter:
             console.print(f"[{style}][{event.upper()}][/] {data.get('message', '')}")
 
         elif event == "refine_done":
-            console.print("  [dim]bug report refined[/dim]")
+            refined = str(data.get("refined", "")).strip()
+            if not refined:
+                console.print("  [dim]bug report refined[/dim]")
+            elif self.verbose:
+                console.print(
+                    Panel(
+                        refined,
+                        title="[bold]Refined bug report[/bold]",
+                        border_style="magenta",
+                        expand=False,
+                    )
+                )
+            else:
+                # Collapsed by default: keep the log concise. The full refined
+                # report is saved to ``refined_report.txt`` in the run directory
+                # (and shown inline with -v).
+                lines = refined.count("\n") + 1
+                console.print(
+                    f"  [magenta]▸ refined bug report[/magenta] "
+                    f"[dim]{lines} lines · saved to refined_report.txt · "
+                    f"-v to show[/dim]"
+                )
 
         elif event == "explore.repo_map":
             modules = str(data.get("overview", "")).count("\n") + 1
@@ -72,9 +93,19 @@ class RunReporter:
 
         elif event == "explore_done":
             files = data.get("files", [])
+            symbols = data.get("symbols", [])
+            body = "\n".join(f"  • {f}" for f in files) or "  [dim](none)[/dim]"
+            if symbols:
+                shown = ", ".join(symbols[:12])
+                more = f" (+{len(symbols) - 12} more)" if len(symbols) > 12 else ""
+                body += f"\n\n[dim]Resolved symbols:[/dim] {shown}{more}"
             console.print(
-                f"  [blue]explored {len(files)} key file(s):[/blue] "
-                f"[dim]{', '.join(files[:5])}[/dim]"
+                Panel(
+                    body,
+                    title=f"[bold]Explored context — {len(files)} key file(s)[/bold]",
+                    border_style="blue",
+                    expand=False,
+                )
             )
 
         elif event == "generate.failure_signature":

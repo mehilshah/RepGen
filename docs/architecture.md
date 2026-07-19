@@ -112,8 +112,10 @@ Complexity gating decides whether a run executes automatically (*Quick*), asks
 for confirmation (*Medium*), or offers execute/prepare-only/skip (*Large*). A
 reproduction that raises the *expected* exception is treated as success even
 though it exits non-zero, so a valid repro is never "refined away". The Rich UI
-in `repgen/ui/` renders streaming output, dependency status, collapsible logs,
-tracebacks, the reproduction verdict, and a final summary.
+in `repgen/ui/` renders milestone progress, dependency status, tracebacks, the
+reproduction verdict, and a final summary; noisy detail (pip/venv/program
+output) is written to `execution.log` in the run directory and shown inline only
+with `-v`.
 
 Execution is **opt-out** (`--no-execute` / `execute = false`); the static
 pipeline above is unchanged and remains the fallback.

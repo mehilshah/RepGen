@@ -80,7 +80,7 @@ class ExplorationAgent:
                 f"Transcript so far:\n{chr(10).join(transcript) or '(empty)'}\n\n"
                 f"Step {step}/{self.max_steps}. Respond with ONE action JSON.{reminder}"
             )
-            response = self.backend.generate(user, system=system, max_tokens=1024)
+            response = self.backend.generate(user, system=system)
             action = parse_action(response.text)
 
             if action is None:

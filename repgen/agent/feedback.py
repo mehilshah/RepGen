@@ -45,7 +45,7 @@ def extract_failure_signature(
     if backend is None:
         return FailureSignature()
     raw = backend.generate(
-        failure_signature_prompt(refined_report), max_tokens=512
+        failure_signature_prompt(refined_report)
     ).text
     payload = extract_json_content(raw) or raw
     try:
