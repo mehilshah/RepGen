@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from typing import Optional
 
@@ -11,6 +12,18 @@ from .base import LLMBackend, LLMResponse
 from .models import default_model, suggested_models
 
 logger = logging.getLogger("repgen.backends")
+
+
+def _uses_openai_reasoning_params(model: str) -> bool:
+    """Whether an official OpenAI model uses the reasoning chat parameters.
+
+    GPT-5/6 and o-series models reject ``max_tokens`` and non-default
+    temperatures.  Avoiding those known-invalid fields prevents two noisy 400
+    responses before every successful request.  Compatible third-party
+    backends still retain the adaptive fallback below.
+    """
+    model_id = model.rsplit("/", 1)[-1].lower()
+    return bool(re.match(r"^(?:gpt-[56](?:[.-]|$)|o[1-9](?:[.-]|$))", model_id))
 
 
 class OpenAICompatibleBackend(LLMBackend):
@@ -90,6 +103,14 @@ class OpenAICompatibleBackend(LLMBackend):
             "reasoning_effort": self.effort.value,
         }
 
+        # These rules are specific to OpenAI's API.  OpenRouter and local
+        # OpenAI-compatible servers can expose similarly named models with
+        # different parameter support, so let their existing error adaptation
+        # handle any mismatch.
+        if self.name == "openai" and _uses_openai_reasoning_params(self.model):
+            params["max_completion_tokens"] = params.pop("max_tokens")
+            params.pop("temperature")
+
         if self.streaming:
             return self._generate_stream(params)
 
@@ -122,7 +143,7 @@ class OpenAICompatibleBackend(LLMBackend):
                 # 'max_completion_tokens' and only the default temperature).
                 # Adapt and retry without spending a network retry.
                 if self._adapt_params(params, e):
-                    logger.info(
+                    logger.debug(
                         "%s: adapting request after unsupported-parameter error",
                         self.name,
                     )
@@ -153,8 +174,8 @@ class OpenAICompatibleBackend(LLMBackend):
         params = {**params, "stream": True, "stream_options": {"include_usage": True}}
         last_error: Optional[Exception] = None
         attempt = 0
+        self._emit("", "start")
         while attempt < self.max_retries:
-            self._emit("", "start")
             text_parts: list[str] = []
             usage: dict = {}
             try:
@@ -180,9 +201,8 @@ class OpenAICompatibleBackend(LLMBackend):
                     text="".join(text_parts).strip(), raw=None, usage=usage
                 )
             except Exception as e:  # noqa: BLE001 - normalize all provider errors
-                self._emit("", "end")
                 if self._adapt_params(params, e):
-                    logger.info(
+                    logger.debug(
                         "%s: adapting stream request after unsupported param",
                         self.name,
                     )
@@ -200,6 +220,7 @@ class OpenAICompatibleBackend(LLMBackend):
                     time.sleep(2 ** (attempt - 1))
 
         logger.error("%s: max stream retries reached (%s)", self.name, last_error)
+        self._emit("", "end")
         return LLMResponse(text="", raw=last_error)
 
 
@@ -220,7 +241,7 @@ def _stream_usage(usage_obj) -> dict:
 class OpenAIBackend(OpenAICompatibleBackend):
     name = "openai"
     env_key = "OPENAI_API_KEY"
-    default_model = default_model("openai", "gpt-5.5")
+    default_model = default_model("openai", "gpt-6-astra")
     suggested_models = suggested_models("openai")
     base_url = None
 
@@ -228,7 +249,7 @@ class OpenAIBackend(OpenAICompatibleBackend):
 class OpenRouterBackend(OpenAICompatibleBackend):
     name = "openrouter"
     env_key = "OPENROUTER_API_KEY"
-    default_model = default_model("openrouter", "anthropic/claude-opus-4-8")
+    default_model = default_model("openrouter", "openai/gpt-6-astra")
     suggested_models = suggested_models("openrouter")
     base_url = "https://openrouter.ai/api/v1"
 
@@ -236,7 +257,7 @@ class OpenRouterBackend(OpenAICompatibleBackend):
 class OllamaBackend(OpenAICompatibleBackend):
     name = "ollama"
     env_key = None  # local, keyless
-    default_model = default_model("ollama", "llama3.1")
+    default_model = default_model("ollama", "qwen3-coder")
     suggested_models = suggested_models("ollama")
 
     @property

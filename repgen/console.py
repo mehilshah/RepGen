@@ -21,6 +21,20 @@ console = Console(theme=custom_theme)
 
 _LOGGING_CONFIGURED = False
 
+# Chatty third-party loggers (per-request HTTP lines, SDK internals). They stay
+# at WARNING even when RepGen itself runs at INFO, so ``-v`` shows RepGen's own
+# progress instead of one line per API call. ``DEBUG`` unmutes them.
+_NOISY_LOGGERS = (
+    "httpx",
+    "httpcore",
+    "openai",
+    "anthropic",
+    "google",
+    "google_genai",
+    "urllib3",
+    "requests",
+)
+
 
 def configure_logging(level: str = "WARNING") -> None:
     """Configure the root logger to render through the shared Rich console.
@@ -39,6 +53,18 @@ def configure_logging(level: str = "WARNING") -> None:
         _LOGGING_CONFIGURED = True
     else:
         logging.getLogger().setLevel(level)
+
+    _quiet_third_party(level)
+
+
+def _quiet_third_party(level: str) -> None:
+    """Pin noisy dependency loggers to WARNING unless we're debugging."""
+    if str(level).upper() == "DEBUG":
+        for name in _NOISY_LOGGERS:
+            logging.getLogger(name).setLevel(logging.NOTSET)
+        return
+    for name in _NOISY_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
 # Configure once at import with a conservative default.

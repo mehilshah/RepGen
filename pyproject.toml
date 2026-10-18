@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "repgen-ai"
-version = "1.0.0"
+version = "1.0.1"
 description = "Exploration-based, CLI-first automated bug reproduction with LLMs"
 readme = "README.md"
 requires-python = ">=3.9"

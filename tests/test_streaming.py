@@ -127,9 +127,38 @@ def test_openai_stream_collects_text_and_emits_deltas(monkeypatch):
     usage_events = [d for d, k in events if k == "usage"]
     assert usage_events, "expected a usage event"
     normalized = json.loads(usage_events[-1])
-    assert normalized["output_tokens"] == 7
+    # OpenAI completion_tokens includes the hidden reasoning tokens.
+    assert normalized["output_tokens"] == 3
     assert normalized["reasoning_tokens"] == 4
     assert events[-2] == (usage_events[-1], "usage")  # right before "end"
+
+
+def test_openai_stream_adaptation_keeps_one_renderer_lifecycle(monkeypatch):
+    chunks = [_chunk(content="ok")]
+
+    class AdaptingCompletions:
+        calls = 0
+
+        def create(self, **params):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError(
+                    "Unsupported parameter: max_tokens; use "
+                    "max_completion_tokens instead"
+                )
+            return _FakeStream(chunks)
+
+    completions = AdaptingCompletions()
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    backend = OpenAIBackend(model="gpt-4o-mini", api_key="k")
+    monkeypatch.setattr(backend, "_client", lambda: client)
+    events: list[tuple[str, str]] = []
+    backend.on_stream = lambda d, k: events.append((d, k))
+
+    assert backend.generate("prompt").text == "ok"
+    assert completions.calls == 2
+    assert [kind for _, kind in events].count("start") == 1
+    assert [kind for _, kind in events].count("end") == 1
 
 
 # -- Usage normalization + token counter --------------------------------
@@ -139,7 +168,7 @@ def test_normalize_usage_across_providers():
     # OpenAI
     assert normalize_usage(
         {"prompt_tokens": 3, "completion_tokens": 7, "reasoning_tokens": 4}
-    ) == {"input_tokens": 3, "output_tokens": 7, "reasoning_tokens": 4}
+    ) == {"input_tokens": 3, "output_tokens": 3, "reasoning_tokens": 4}
     # Gemini
     assert normalize_usage(
         {"promptTokenCount": 10, "candidatesTokenCount": 200,

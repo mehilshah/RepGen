@@ -40,7 +40,7 @@ def parse_gemini_sse_chunk(chunk: dict) -> tuple[str, str, dict]:
 class GeminiBackend(LLMBackend):
     name = "gemini"
     env_key = "GEMINI_API_KEY"
-    default_model = default_model("gemini", "gemini-3.1-pro")
+    default_model = default_model("gemini", "gemini-3.1-pro-preview")
     suggested_models = suggested_models("gemini")
     max_retries = 3
 

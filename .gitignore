@@ -26,3 +26,8 @@ logs/
 .ssh/
 .kube/
 *.log
+
+## Custom ignore rules
+arXiv*
+paper*
+icse*

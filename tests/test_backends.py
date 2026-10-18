@@ -1,7 +1,21 @@
 import pytest
 
 from repgen.backends import BACKEND_NAMES, get_backend, list_backends
-from repgen.backends.openai_backend import OllamaBackend
+from repgen.backends.openai_backend import OllamaBackend, OpenAIBackend
+
+
+class _CapturingCompletions:
+    def __init__(self):
+        self.params = None
+
+    def create(self, **params):
+        from types import SimpleNamespace
+
+        self.params = params
+        message = SimpleNamespace(content="ok")
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=message)], usage=None
+        )
 
 
 def test_registry_has_five_backends():
@@ -53,3 +67,31 @@ def test_ollama_base_url_respects_env(monkeypatch):
 
 def test_list_backends_returns_all():
     assert len(list_backends()) == len(BACKEND_NAMES)
+
+
+def test_openai_reasoning_model_uses_valid_params_without_400_retry(monkeypatch):
+    from types import SimpleNamespace
+
+    completions = _CapturingCompletions()
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    backend = OpenAIBackend(model="gpt-5-mini", api_key="k")
+    monkeypatch.setattr(backend, "_client", lambda: client)
+
+    assert backend.generate("prompt").text == "ok"
+    assert completions.params["max_completion_tokens"] > 0
+    assert "max_tokens" not in completions.params
+    assert "temperature" not in completions.params
+
+
+def test_latest_openai_reasoning_model_uses_valid_params(monkeypatch):
+    from types import SimpleNamespace
+
+    completions = _CapturingCompletions()
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    backend = OpenAIBackend(model="gpt-6-astra", api_key="k")
+    monkeypatch.setattr(backend, "_client", lambda: client)
+
+    assert backend.generate("prompt").text == "ok"
+    assert "max_completion_tokens" in completions.params
+    assert "max_tokens" not in completions.params
+    assert "temperature" not in completions.params

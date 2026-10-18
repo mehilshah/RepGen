@@ -62,7 +62,7 @@ Medium/Large gating, a `confirm_callback` returning an `ExecutionDecision`.
 ```python
 from repgen.backends import get_backend, list_backends
 
-client = get_backend("claude")  # defaults to claude-opus-4-8
+client = get_backend("claude")  # defaults to claude-opus-5-5
 print(client.is_configured(), client.list_models())
 response = client.generate("Say hi.")
 print(response.text)

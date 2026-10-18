@@ -17,7 +17,7 @@ def test_every_backend_has_a_default():
 
 
 def test_claude_default_is_current_opus():
-    assert default_model("claude") == "claude-opus-4-8"
+    assert default_model("claude") == "claude-opus-5-5"
 
 
 def test_suggested_models_nonempty_for_known_backends():
@@ -33,7 +33,7 @@ def test_unknown_backend_returns_empty():
 
 def test_backend_reads_catalog():
     b = get_backend("claude")
-    assert b.default_model == "claude-opus-4-8"
+    assert b.default_model == "claude-opus-5-5"
     assert "claude-sonnet-5" in b.list_models()
 
 

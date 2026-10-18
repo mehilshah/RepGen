@@ -38,12 +38,26 @@ def normalize_usage(usage: dict) -> dict:
                 return value
         return None
 
+    output_tokens = pick(
+        "completion_tokens", "output_tokens", "candidatesTokenCount"
+    )
+    reasoning_tokens = pick("reasoning_tokens", "thoughtsTokenCount")
+
+    # OpenAI's ``completion_tokens`` includes hidden reasoning tokens.  Other
+    # providers' canonical ``output_tokens`` / ``candidatesTokenCount`` do not,
+    # so only adjust the OpenAI-shaped payload.  Without this, the renderer
+    # reports hidden reasoning twice: once as output and once as thinking.
+    if (
+        "completion_tokens" in usage
+        and output_tokens is not None
+        and reasoning_tokens is not None
+    ):
+        output_tokens = max(0, output_tokens - reasoning_tokens)
+
     canonical = {
         "input_tokens": pick("prompt_tokens", "input_tokens", "promptTokenCount"),
-        "output_tokens": pick(
-            "completion_tokens", "output_tokens", "candidatesTokenCount"
-        ),
-        "reasoning_tokens": pick("reasoning_tokens", "thoughtsTokenCount"),
+        "output_tokens": output_tokens,
+        "reasoning_tokens": reasoning_tokens,
         "total_tokens": pick("total_tokens", "totalTokenCount"),
     }
     return {k: v for k, v in canonical.items() if v is not None}

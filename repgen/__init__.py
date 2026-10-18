@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 __all__ = ["reproduce", "RepGenService", "__version__"]
 

@@ -39,7 +39,7 @@ def parse_claude_sse_event(event: dict) -> tuple[str, str, dict]:
 class ClaudeBackend(LLMBackend):
     name = "claude"
     env_key = "ANTHROPIC_API_KEY"
-    default_model = default_model("claude", "claude-opus-4-8")
+    default_model = default_model("claude", "claude-opus-5-5")
     suggested_models = suggested_models("claude")
     max_retries = 3
     api_url = "https://api.anthropic.com/v1/messages"
@@ -99,7 +99,7 @@ class ClaudeBackend(LLMBackend):
                         payload.pop("output_config", None)
                         payload["temperature"] = temperature
                         modern = False
-                        logger.info(
+                        logger.debug(
                             "Claude: model %s rejected adaptive/effort; "
                             "falling back to a plain request",
                             self.model,
