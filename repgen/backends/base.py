@@ -38,9 +38,7 @@ def normalize_usage(usage: dict) -> dict:
                 return value
         return None
 
-    output_tokens = pick(
-        "completion_tokens", "output_tokens", "candidatesTokenCount"
-    )
+    output_tokens = pick("completion_tokens", "output_tokens", "candidatesTokenCount")
     reasoning_tokens = pick("reasoning_tokens", "thoughtsTokenCount")
 
     # OpenAI's ``completion_tokens`` includes hidden reasoning tokens.  Other

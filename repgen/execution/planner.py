@@ -27,8 +27,18 @@ logger = logging.getLogger("repgen.execution.planner")
 
 # Heavy packages that strongly suggest a non-trivial run when detected.
 _HEAVY_PACKAGES = {
-    "torch", "tensorflow", "jax", "transformers", "datasets", "keras",
-    "xgboost", "lightgbm", "spacy", "detectron2", "mmcv", "vllm",
+    "torch",
+    "tensorflow",
+    "jax",
+    "transformers",
+    "datasets",
+    "keras",
+    "xgboost",
+    "lightgbm",
+    "spacy",
+    "detectron2",
+    "mmcv",
+    "vllm",
 }
 
 

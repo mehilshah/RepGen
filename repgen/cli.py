@@ -8,7 +8,6 @@ import tempfile
 from typing import Optional
 
 import typer
-from rich.panel import Panel
 from rich.prompt import IntPrompt, Prompt
 from rich.table import Table
 
@@ -70,9 +69,7 @@ def _prompt_effort(default: str = "medium") -> str:
     default_tier = ReasoningEffort.coerce(default)
     for i, tier in enumerate(tiers, 1):
         marker = " [cyan](default)[/cyan]" if tier is default_tier else ""
-        console.print(
-            f"  {i}) {tier.value} — {tier.label}: {tier.description}{marker}"
-        )
+        console.print(f"  {i}) {tier.value} — {tier.label}: {tier.description}{marker}")
     choice = IntPrompt.ask(
         "Choice",
         choices=[str(i) for i in range(1, len(tiers) + 1)],
@@ -93,9 +90,7 @@ def _prompt_backend(default: Optional[str] = None) -> str:
         )
         marker = " [cyan](default)[/cyan]" if name == default else ""
         console.print(f"  {i}) {name}  {state}{marker}")
-    default_idx = (
-        BACKEND_NAMES.index(default) + 1 if default in BACKEND_NAMES else None
-    )
+    default_idx = BACKEND_NAMES.index(default) + 1 if default in BACKEND_NAMES else None
     choice = IntPrompt.ask(
         "Choice",
         choices=[str(i) for i in range(1, len(BACKEND_NAMES) + 1)],
@@ -203,7 +198,9 @@ def run(
     ),
     model: Optional[str] = typer.Option(None, "--model", help="Model name."),
     reasoning_effort: Optional[str] = typer.Option(
-        None, "--reasoning-effort", "-e",
+        None,
+        "--reasoning-effort",
+        "-e",
         help="How hard to think: low | medium | high (sizes reasoning + token "
         "limits for every operation).",
     ),
@@ -220,11 +217,14 @@ def run(
         None, "--max-explore-steps", help="Max exploration steps."
     ),
     framework: Optional[str] = typer.Option(
-        None, "--framework", "-f",
+        None,
+        "--framework",
+        "-f",
         help=f"Target framework ({', '.join(FRAMEWORK_NAMES)}).",
     ),
     execute: Optional[bool] = typer.Option(
-        None, "--execute/--no-execute",
+        None,
+        "--execute/--no-execute",
         help="Plan, prepare a venv, run and verify the reproduction "
         "(default from config).",
     ),
@@ -274,7 +274,9 @@ def run(
     # ceiling for every operation. CLI flag > config > interactive prompt.
     if reasoning_effort is None:
         reasoning_effort = (
-            cfg.reasoning_effort if yes else _prompt_effort(default=cfg.reasoning_effort)
+            cfg.reasoning_effort
+            if yes
+            else _prompt_effort(default=cfg.reasoning_effort)
         )
     reasoning_effort = ReasoningEffort.coerce(reasoning_effort).value
 
@@ -387,7 +389,9 @@ def frameworks() -> None:
 @app.command()
 def models(
     backend: Optional[str] = typer.Option(
-        None, "--backend", help=f"Backend to list models for ({', '.join(BACKEND_NAMES)})."
+        None,
+        "--backend",
+        help=f"Backend to list models for ({', '.join(BACKEND_NAMES)}).",
     ),
 ) -> None:
     """List suggested state-of-the-art models per backend."""
@@ -411,7 +415,9 @@ def models(
 def new_project(
     path: str = typer.Argument(..., help="Directory for the new local project."),
     framework: Optional[str] = typer.Option(
-        None, "--framework", "-f",
+        None,
+        "--framework",
+        "-f",
         help=f"Framework scaffold ({', '.join(FRAMEWORK_NAMES)}).",
     ),
     force: bool = typer.Option(
@@ -456,7 +462,9 @@ def open_project_cmd(
     table.add_column("Value")
     table.add_row("Framework (detected)", fw.display_name)
     table.add_row("Local modules", ", ".join(project.local_modules) or "(none)")
-    table.add_row("requirements.txt", "yes" if project.requirements_path.exists() else "no")
+    table.add_row(
+        "requirements.txt", "yes" if project.requirements_path.exists() else "no"
+    )
     console.print(table)
     console.print(
         f"[dim]Run: repgen run --repo {project.path} "

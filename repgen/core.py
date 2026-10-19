@@ -102,9 +102,7 @@ class RepGenService:
             _prev_stream = client.on_stream
             client.on_stream = None
             try:
-                refined = client.generate(
-                    refinement_prompt(bug_report_content)
-                ).text
+                refined = client.generate(refinement_prompt(bug_report_content)).text
             finally:
                 client.on_stream = _prev_stream
             refined = refined or bug_report_content

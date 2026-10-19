@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import Optional
 
 from .base import LLMBackend, LLMResponse
-from .reasoning import ReasoningEffort
 from .claude import ClaudeBackend
 from .gemini import GeminiBackend
 from .openai_backend import (
@@ -18,6 +17,7 @@ from .openai_backend import (
     OpenAIBackend,
     OpenRouterBackend,
 )
+from .reasoning import ReasoningEffort
 
 # Ordered registry of provider name -> backend class.
 BACKENDS: dict[str, type[LLMBackend]] = {

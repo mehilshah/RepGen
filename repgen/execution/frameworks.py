@@ -40,7 +40,9 @@ class Framework:
     # ``{python}`` with the venv python, ``{module}`` with the entry module name.
     run_template: List[str] = field(default_factory=lambda: ["{python}", "{entry}"])
     entrypoint: str = "main.py"
-    test_command: List[str] = field(default_factory=lambda: ["{python}", "-m", "pytest", "-q"])
+    test_command: List[str] = field(
+        default_factory=lambda: ["{python}", "-m", "pytest", "-q"]
+    )
     prompt_hint: str = ""
     scaffold: List[ScaffoldFile] = field(default_factory=list)
 
@@ -179,8 +181,13 @@ FRAMEWORKS: Dict[str, Framework] = {
         display_name="Streamlit",
         dependencies=["streamlit"],
         run_template=[
-            "{python}", "-m", "streamlit", "run", "{entry}",
-            "--server.headless", "true",
+            "{python}",
+            "-m",
+            "streamlit",
+            "run",
+            "{entry}",
+            "--server.headless",
+            "true",
         ],
         entrypoint="app.py",
         prompt_hint=(

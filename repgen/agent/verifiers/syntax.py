@@ -9,7 +9,6 @@ import ast
 
 from .base import Feedback, Finding, VerificationContext, Verifier
 
-
 # Node types that make a script an actual reproduction (imports the code under
 # test, calls into it, defines/asserts something) rather than a no-op.
 _SUBSTANTIVE = (

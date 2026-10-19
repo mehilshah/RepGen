@@ -104,14 +104,63 @@ def _stdlib_modules() -> Set[str]:
         return set(names)
     # Fallback for <3.10: a conservative, commonly-used subset.
     return {
-        "abc", "argparse", "ast", "asyncio", "base64", "collections", "contextlib",
-        "copy", "csv", "dataclasses", "datetime", "decimal", "enum", "functools",
-        "glob", "hashlib", "heapq", "hmac", "html", "http", "importlib", "inspect",
-        "io", "itertools", "json", "logging", "math", "multiprocessing", "os",
-        "pathlib", "pickle", "queue", "random", "re", "shutil", "signal", "socket",
-        "sqlite3", "ssl", "string", "struct", "subprocess", "sys", "tempfile",
-        "textwrap", "threading", "time", "traceback", "typing", "unittest",
-        "urllib", "uuid", "warnings", "weakref", "xml", "zipfile", "zlib",
+        "abc",
+        "argparse",
+        "ast",
+        "asyncio",
+        "base64",
+        "collections",
+        "contextlib",
+        "copy",
+        "csv",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "enum",
+        "functools",
+        "glob",
+        "hashlib",
+        "heapq",
+        "hmac",
+        "html",
+        "http",
+        "importlib",
+        "inspect",
+        "io",
+        "itertools",
+        "json",
+        "logging",
+        "math",
+        "multiprocessing",
+        "os",
+        "pathlib",
+        "pickle",
+        "queue",
+        "random",
+        "re",
+        "shutil",
+        "signal",
+        "socket",
+        "sqlite3",
+        "ssl",
+        "string",
+        "struct",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "textwrap",
+        "threading",
+        "time",
+        "traceback",
+        "typing",
+        "unittest",
+        "urllib",
+        "uuid",
+        "warnings",
+        "weakref",
+        "xml",
+        "zipfile",
+        "zlib",
     }
 
 
@@ -215,9 +264,7 @@ class DependencyResolver:
                 existing[match.group(1).lower()] = line
         return existing
 
-    def update_requirements(
-        self, path: Path, requirements: Iterable[str]
-    ) -> List[str]:
+    def update_requirements(self, path: Path, requirements: Iterable[str]) -> List[str]:
         """Merge ``requirements`` into the file at ``path``.
 
         Never downgrades or clobbers an existing pin — a requirement already
@@ -244,7 +291,9 @@ class DependencyResolver:
                 if current and not current.endswith("\n"):
                     prefix = "\n"
             else:
-                new_lines = ["# Managed by RepGen — auto-detected dependencies"] + new_lines
+                new_lines = [
+                    "# Managed by RepGen — auto-detected dependencies"
+                ] + new_lines
             with open(path, "a", encoding="utf-8") as f:
                 f.write(prefix + "\n".join(new_lines) + "\n")
             logger.info("Added %d requirement(s) to %s", len(added), path)

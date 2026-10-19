@@ -216,8 +216,16 @@ class ExecutionPipeline:
         # 4. Execute with refine/retry loop.
         outcome.executed = True
         self._execute_loop(
-            code, outcome, run_dir, env, fw, goal, bug_report,
-            failure_signature, plan, script_name,
+            code,
+            outcome,
+            run_dir,
+            env,
+            fw,
+            goal,
+            bug_report,
+            failure_signature,
+            plan,
+            script_name,
         )
         return outcome
 
@@ -285,9 +293,7 @@ class ExecutionPipeline:
         # this only fills gaps the repo install didn't cover.
         if deps.requirements:
             self._notify("install_start", requirements=deps.requirements)
-            result = manager.install(
-                env, deps.requirements, on_line=install_line
-            )
+            result = manager.install(env, deps.requirements, on_line=install_line)
             self._notify("install_done", result=result)
             if not result.success:
                 self._notify(
@@ -318,7 +324,9 @@ class ExecutionPipeline:
                 result = manager.install_requirements_file(
                     env, req_file, on_line=on_line
                 )
-                self._notify("repo_requirements_done", result=result, file=str(req_file))
+                self._notify(
+                    "repo_requirements_done", result=result, file=str(req_file)
+                )
 
         if _is_packaged(repo_path):
             self._notify("project_install_start", path=str(repo_path), editable=True)
@@ -330,7 +338,9 @@ class ExecutionPipeline:
                 return
             # Editable install failed (build error, exotic layout): fall back to
             # PYTHONPATH so imports still resolve against the source tree.
-            logger.warning("Editable install of %s failed; using PYTHONPATH.", repo_path)
+            logger.warning(
+                "Editable install of %s failed; using PYTHONPATH.", repo_path
+            )
 
         env.extra_pythonpath = str(repo_path)
         self._notify("project_on_path", path=str(repo_path))
@@ -377,9 +387,7 @@ class ExecutionPipeline:
         timeout = self.settings.timeout_for(plan.complexity, plan.estimated_minutes)
         # When the repo couldn't be pip-installed, make it importable via
         # PYTHONPATH so ``import <library under test>`` resolves at run time.
-        run_env = (
-            {"PYTHONPATH": env.extra_pythonpath} if env.extra_pythonpath else None
-        )
+        run_env = {"PYTHONPATH": env.extra_pythonpath} if env.extra_pythonpath else None
         current = code
 
         total = self.settings.max_retries + 1
@@ -403,8 +411,12 @@ class ExecutionPipeline:
                     "exec_line", line=line, stream=stream, attempt=attempt_no
                 ),
             )
-            self._notify("exec_done", attempt=attempt_no, result=result,
-                         elapsed=time.time() - start)
+            self._notify(
+                "exec_done",
+                attempt=attempt_no,
+                result=result,
+                elapsed=time.time() - start,
+            )
 
             verdict = self.analyzer.analyze(result, bug_report, failure_signature)
             self._notify("verdict", attempt=attempt_no, verdict=verdict)

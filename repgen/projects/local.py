@@ -20,9 +20,23 @@ logger = logging.getLogger("repgen.projects.local")
 
 # Directories that never contain the project's own importable modules.
 _IGNORE_DIRS = {
-    ".git", ".hg", ".svn", "__pycache__", ".venv", "venv", "env",
-    ".mypy_cache", ".pytest_cache", "node_modules", "build", "dist",
-    ".tox", ".eggs", "site-packages", ".idea", ".vscode",
+    ".git",
+    ".hg",
+    ".svn",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "env",
+    ".mypy_cache",
+    ".pytest_cache",
+    "node_modules",
+    "build",
+    "dist",
+    ".tox",
+    ".eggs",
+    "site-packages",
+    ".idea",
+    ".vscode",
 }
 
 
@@ -85,9 +99,7 @@ def open_project(path: str, framework: Optional[str] = None) -> LocalProject:
     fw = _detect_framework(root) if framework is None else framework
     modules = discover_local_modules(root)
     logger.info("Opened local project %s (framework=%s)", root, fw)
-    return LocalProject(
-        path=root, framework=fw, created=False, local_modules=modules
-    )
+    return LocalProject(path=root, framework=fw, created=False, local_modules=modules)
 
 
 def create_project(

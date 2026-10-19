@@ -44,9 +44,7 @@ def extract_failure_signature(
     """Ask the LLM for the expected failure signature (best effort)."""
     if backend is None:
         return FailureSignature()
-    raw = backend.generate(
-        failure_signature_prompt(refined_report)
-    ).text
+    raw = backend.generate(failure_signature_prompt(refined_report)).text
     payload = extract_json_content(raw) or raw
     try:
         data = json.loads(payload)

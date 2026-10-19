@@ -22,8 +22,8 @@ from .dependencies import (
 )
 from .environment import EnvironmentManager, PreparedEnvironment
 from .hardware import HardwareInfo, detect_hardware
-from .planner import Complexity, ExecutionPlan, ExecutionPlanner
 from .pipeline import ExecutionOutcome, ExecutionPipeline
+from .planner import Complexity, ExecutionPlan, ExecutionPlanner
 from .reproduction import ReproductionAnalyzer, ReproductionVerdict
 from .runner import CodeRunner, ExecutionResult
 

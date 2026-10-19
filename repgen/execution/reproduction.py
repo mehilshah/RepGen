@@ -202,7 +202,9 @@ class ReproductionAnalyzer:
         return ReproductionVerdict(
             reproduced=bool(data.get("reproduced", False)),
             confidence=_clamp(_as_float(data.get("confidence"), 0.5)),
-            matching_evidence=[str(e) for e in (data.get("matching_evidence") or []) if e],
+            matching_evidence=[
+                str(e) for e in (data.get("matching_evidence") or []) if e
+            ],
             key_error=str(data.get("key_error", "")),
             explanation=str(data.get("explanation", "")),
             debugging_insights=[

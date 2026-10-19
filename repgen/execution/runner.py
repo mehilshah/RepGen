@@ -29,7 +29,9 @@ LineCallback = Optional[Callable[[str, str], None]]
 
 _TRACEBACK_HEADER = "Traceback (most recent call last):"
 # Matches the final "ExceptionType: message" line of a traceback.
-_EXC_LINE_RE = re.compile(r"^([A-Za-z_][\w.]*(?:Error|Exception|Warning|Exit))\b:?(.*)$")
+_EXC_LINE_RE = re.compile(
+    r"^([A-Za-z_][\w.]*(?:Error|Exception|Warning|Exit))\b:?(.*)$"
+)
 
 
 @dataclass

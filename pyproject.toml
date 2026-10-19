@@ -8,14 +8,13 @@ version = "1.0.1"
 description = "Exploration-based, CLI-first automated bug reproduction with LLMs"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
   { name = "Mehil Shah", email = "shahmehil@dal.ca" },
 ]
 keywords = ["llm", "bug-reproduction", "agent", "cli", "deep-learning"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Environment :: Console",
     "Intended Audience :: Developers",

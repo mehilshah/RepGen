@@ -131,9 +131,7 @@ class OpenAICompatibleBackend(LLMBackend):
                     # Reasoning models report how much of the completion was
                     # spent thinking — surface it so a near-empty answer with a
                     # huge reasoning count is visible rather than mysterious.
-                    details = getattr(
-                        response.usage, "completion_tokens_details", None
-                    )
+                    details = getattr(response.usage, "completion_tokens_details", None)
                     reasoning = getattr(details, "reasoning_tokens", None)
                     if reasoning is not None:
                         usage["reasoning_tokens"] = reasoning

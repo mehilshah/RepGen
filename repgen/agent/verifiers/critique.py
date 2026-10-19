@@ -21,9 +21,7 @@ class CritiqueVerifier(Verifier):
         if backend is None:
             return Feedback(stage=self.stage, passed=True, severity="info")
 
-        raw = backend.generate(
-            critique_prompt(ctx.refined_report, code)
-        ).text
+        raw = backend.generate(critique_prompt(ctx.refined_report, code)).text
         payload = self._parse(raw)
         if payload is None:
             # Non-blocking: don't fail a run because the judge misbehaved.

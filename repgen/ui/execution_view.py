@@ -107,8 +107,12 @@ class ExecutionReporter:
             info = data.get("info")
             if info is not None and self.verbose:
                 console.print(
-                    Panel(info.render(), title="[cyan]Detected hardware[/cyan]",
-                          border_style="cyan", expand=False)
+                    Panel(
+                        info.render(),
+                        title="[cyan]Detected hardware[/cyan]",
+                        border_style="cyan",
+                        expand=False,
+                    )
                 )
 
         elif event == "dependencies":
@@ -271,8 +275,12 @@ class ExecutionReporter:
         if result.traceback and result.raised:
             console.print(
                 Panel(
-                    Syntax(result.traceback.strip(), "pytb", theme="monokai",
-                           word_wrap=True),
+                    Syntax(
+                        result.traceback.strip(),
+                        "pytb",
+                        theme="monokai",
+                        word_wrap=True,
+                    ),
                     title="[red]Traceback[/red]",
                     border_style="red",
                     expand=False,
@@ -299,8 +307,9 @@ class ExecutionReporter:
         if not verdict.reproduced and verdict.debugging_insights:
             body.append("\nDebugging insights:")
             body += [f"  → {h}" for h in verdict.debugging_insights]
-        console.print(Panel("\n".join(body), title=title, border_style=style,
-                            expand=False))
+        console.print(
+            Panel("\n".join(body), title=title, border_style=style, expand=False)
+        )
 
     # -- final summary ----------------------------------------------------
     def summary(self, outcome) -> None:
@@ -314,12 +323,18 @@ class ExecutionReporter:
     def _summary(self, outcome) -> None:
         if outcome is None:
             return
-        table = Table(title="Execution summary", header_style="bold magenta",
-                      show_header=True, expand=False)
+        table = Table(
+            title="Execution summary",
+            header_style="bold magenta",
+            show_header=True,
+            expand=False,
+        )
         table.add_column("Field", style="cyan")
         table.add_column("Value")
         table.add_row("Executed", "yes" if outcome.executed else "no")
-        table.add_row("Decision", str(getattr(outcome.decision, "value", outcome.decision)))
+        table.add_row(
+            "Decision", str(getattr(outcome.decision, "value", outcome.decision))
+        )
         if outcome.plan:
             table.add_row("Complexity", outcome.plan.complexity.label)
             table.add_row("Est. runtime", f"~{outcome.plan.estimated_minutes:.0f} min")
@@ -362,9 +377,7 @@ def interactive_confirm(plan, hardware):
             choices=["yes", "no"],
             default="yes",
         )
-        return (
-            ExecutionDecision.EXECUTE if choice == "yes" else ExecutionDecision.SKIP
-        )
+        return ExecutionDecision.EXECUTE if choice == "yes" else ExecutionDecision.SKIP
 
     # Large (or anything heavier): offer the three-way choice.
     choice = Prompt.ask(

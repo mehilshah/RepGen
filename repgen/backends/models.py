@@ -54,19 +54,23 @@ class ProviderModels:
 MODEL_CATALOG: Dict[str, ProviderModels] = {
     "claude": ProviderModels(
         [
-            ModelSpec("claude-opus-5-5", "Claude Opus 5.5",
-                      ("reasoning", "coding", "agentic"), default=True),
-            ModelSpec("claude-sonnet-5-5", "Claude Sonnet 5.5",
-                      ("balanced", "coding")),
-            ModelSpec("claude-fable-5-1", "Claude Fable 5.1",
-                      ("fast", "agentic")),
-            ModelSpec("claude-opus-4-8", "Claude Opus 4.8",
-                      ("reasoning", "coding", "agentic")),
+            ModelSpec(
+                "claude-opus-5-5",
+                "Claude Opus 5.5",
+                ("reasoning", "coding", "agentic"),
+                default=True,
+            ),
+            ModelSpec("claude-sonnet-5-5", "Claude Sonnet 5.5", ("balanced", "coding")),
+            ModelSpec("claude-fable-5-1", "Claude Fable 5.1", ("fast", "agentic")),
+            ModelSpec(
+                "claude-opus-4-8", "Claude Opus 4.8", ("reasoning", "coding", "agentic")
+            ),
             ModelSpec("claude-opus-4-7", "Claude Opus 4.7", ("reasoning", "coding")),
             ModelSpec("claude-opus-4-6", "Claude Opus 4.6", ("reasoning", "coding")),
             ModelSpec("claude-opus-4-5", "Claude Opus 4.5", ("reasoning", "coding")),
-            ModelSpec("claude-fable-5", "Claude Fable 5",
-                      ("frontier", "reasoning", "agentic")),
+            ModelSpec(
+                "claude-fable-5", "Claude Fable 5", ("frontier", "reasoning", "agentic")
+            ),
             ModelSpec("claude-sonnet-5", "Claude Sonnet 5", ("balanced", "coding")),
             ModelSpec("claude-sonnet-4-6", "Claude Sonnet 4.6", ("balanced", "coding")),
             ModelSpec("claude-sonnet-4-5", "Claude Sonnet 4.5", ("balanced", "coding")),
@@ -75,15 +79,16 @@ MODEL_CATALOG: Dict[str, ProviderModels] = {
     ),
     "openai": ProviderModels(
         [
-            ModelSpec("gpt-6-astra", "GPT-6 Astra",
-                      ("reasoning", "coding", "agentic"), default=True),
-            ModelSpec("gpt-6.1-sol", "GPT-6.1 Sol",
-                      ("balanced", "coding")),
+            ModelSpec(
+                "gpt-6-astra",
+                "GPT-6 Astra",
+                ("reasoning", "coding", "agentic"),
+                default=True,
+            ),
+            ModelSpec("gpt-6.1-sol", "GPT-6.1 Sol", ("balanced", "coding")),
             ModelSpec("gpt-6-luna", "GPT-6 Luna", ("fast", "cheap")),
-            ModelSpec("gpt-5.6-cyber", "GPT-5.6 Cyber",
-                      ("reasoning", "coding")),
-            ModelSpec("gpt-5.5", "GPT-5.5",
-                      ("reasoning", "coding", "agentic")),
+            ModelSpec("gpt-5.6-cyber", "GPT-5.6 Cyber", ("reasoning", "coding")),
+            ModelSpec("gpt-5.5", "GPT-5.5", ("reasoning", "coding", "agentic")),
             ModelSpec("gpt-5.5-pro", "GPT-5.5 Pro", ("reasoning", "frontier")),
             ModelSpec("gpt-5.5-mini", "GPT-5.5 mini", ("fast", "cheap")),
             ModelSpec("gpt-5.4", "GPT-5.4", ("reasoning", "coding")),
@@ -98,50 +103,78 @@ MODEL_CATALOG: Dict[str, ProviderModels] = {
     ),
     "gemini": ProviderModels(
         [
-            ModelSpec("gemini-3.1-pro-preview", "Gemini 3.1 Pro (Preview)",
-                      ("reasoning", "coding"), default=True),
-            ModelSpec("gemini-3.8-flash", "Gemini 3.8 Flash",
-                      ("fast", "agentic")),
+            ModelSpec(
+                "gemini-3.1-pro-preview",
+                "Gemini 3.1 Pro (Preview)",
+                ("reasoning", "coding"),
+                default=True,
+            ),
+            ModelSpec("gemini-3.8-flash", "Gemini 3.8 Flash", ("fast", "agentic")),
             ModelSpec("gemini-3.7-flash", "Gemini 3.7 Flash", ("fast",)),
             ModelSpec("gemini-3.6-flash", "Gemini 3.6 Flash", ("fast",)),
             ModelSpec("gemini-3.5-flash", "Gemini 3.5 Flash", ("fast",)),
-            ModelSpec("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite",
-                      ("fast", "cheap")),
-            ModelSpec("gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite",
-                      ("fast", "cheap")),
+            ModelSpec(
+                "gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite", ("fast", "cheap")
+            ),
+            ModelSpec(
+                "gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite", ("fast", "cheap")
+            ),
             ModelSpec("gemini-3-pro", "Gemini 3 Pro", ("reasoning", "coding")),
             ModelSpec("gemini-3-flash", "Gemini 3 Flash", ("fast",)),
             ModelSpec("gemini-2.5-pro", "Gemini 2.5 Pro", ("reasoning",)),
             ModelSpec("gemini-2.5-flash", "Gemini 2.5 Flash", ("fast",)),
-            ModelSpec("gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite",
-                      ("fast", "cheap")),
+            ModelSpec(
+                "gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite", ("fast", "cheap")
+            ),
         ]
     ),
     "openrouter": ProviderModels(
         [
-            ModelSpec("openai/gpt-6-astra", "GPT-6 Astra (via OpenRouter)",
-                      ("reasoning", "coding"), default=True),
-            ModelSpec("openai/gpt-6.1-sol", "GPT-6.1 Sol (via OpenRouter)",
-                      ("balanced", "coding")),
-            ModelSpec("anthropic/claude-opus-5.5", "Claude Opus 5.5 (via OpenRouter)",
-                      ("reasoning", "coding")),
-            ModelSpec("anthropic/claude-sonnet-5.5", "Claude Sonnet 5.5 (via OpenRouter)",
-                      ("balanced", "coding")),
-            ModelSpec("google/gemini-3.8-flash", "Gemini 3.8 Flash (via OpenRouter)",
-                      ("fast", "agentic")),
-            ModelSpec("anthropic/claude-opus-4-8", "Claude Opus 4.8 (via OpenRouter)",
-                      ("reasoning", "coding")),
+            ModelSpec(
+                "openai/gpt-6-astra",
+                "GPT-6 Astra (via OpenRouter)",
+                ("reasoning", "coding"),
+                default=True,
+            ),
+            ModelSpec(
+                "openai/gpt-6.1-sol",
+                "GPT-6.1 Sol (via OpenRouter)",
+                ("balanced", "coding"),
+            ),
+            ModelSpec(
+                "anthropic/claude-opus-5.5",
+                "Claude Opus 5.5 (via OpenRouter)",
+                ("reasoning", "coding"),
+            ),
+            ModelSpec(
+                "anthropic/claude-sonnet-5.5",
+                "Claude Sonnet 5.5 (via OpenRouter)",
+                ("balanced", "coding"),
+            ),
+            ModelSpec(
+                "google/gemini-3.8-flash",
+                "Gemini 3.8 Flash (via OpenRouter)",
+                ("fast", "agentic"),
+            ),
+            ModelSpec(
+                "anthropic/claude-opus-4-8",
+                "Claude Opus 4.8 (via OpenRouter)",
+                ("reasoning", "coding"),
+            ),
             ModelSpec("openai/gpt-5.5", "GPT-5.5 (via OpenRouter)", ("reasoning",)),
-            ModelSpec("google/gemini-3.1-pro", "Gemini 3.1 Pro (via OpenRouter)",
-                      ("reasoning",)),
-            ModelSpec("meta-llama/llama-3.1-70b-instruct", "Llama 3.1 70B",
-                      ("open-weight",)),
+            ModelSpec(
+                "google/gemini-3.1-pro",
+                "Gemini 3.1 Pro (via OpenRouter)",
+                ("reasoning",),
+            ),
+            ModelSpec(
+                "meta-llama/llama-3.1-70b-instruct", "Llama 3.1 70B", ("open-weight",)
+            ),
         ]
     ),
     "ollama": ProviderModels(
         [
-            ModelSpec("qwen3-coder", "Qwen3 Coder", ("coding", "local"),
-                      default=True),
+            ModelSpec("qwen3-coder", "Qwen3 Coder", ("coding", "local"), default=True),
             ModelSpec("qwen3", "Qwen3", ("reasoning", "local")),
             ModelSpec("deepseek-r1", "DeepSeek R1", ("reasoning", "local")),
             ModelSpec("llama3.3", "Llama 3.3", ("local",)),

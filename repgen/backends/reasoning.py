@@ -28,9 +28,9 @@ from enum import Enum
 class ReasoningEffort(str, Enum):
     """How hard the model should think, as a named tier."""
 
-    LOW = "low"       # Quick — latency/cost-sensitive (classification, short gen)
+    LOW = "low"  # Quick — latency/cost-sensitive (classification, short gen)
     MEDIUM = "medium"  # Balanced — the default
-    HIGH = "high"     # Thorough — multi-step reasoning, hard analysis
+    HIGH = "high"  # Thorough — multi-step reasoning, hard analysis
 
     @classmethod
     def coerce(cls, value: "ReasoningEffort | str | None") -> "ReasoningEffort":
